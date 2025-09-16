@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ورود به پنل مدیریت - Telegram Channel Manager</title>
+
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;700&display=swap');
+
+        * {
+            font-family: 'Vazirmatn', sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .login-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+            max-width: 450px;
+            width: 100%;
+            animation: slideIn 0.5s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .login-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 40px 30px;
+            text-align: center;
+            color: white;
+        }
+
+        .login-header i {
+            font-size: 60px;
+            margin-bottom: 20px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .login-header h2 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 700;
+        }
+
+        .login-header p {
+            margin: 10px 0 0;
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .login-body {
+            padding: 40px 30px;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        .form-label {
+            color: #555;
+            font-weight: 500;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
+        .form-control {
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 12px 15px;
+            font-size: 14px;
+            transition: all 0.3s;
+            direction: ltr;
+            text-align: left;
+        }
+
+        .form-control:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+        }
+
+        .input-group {
+            position: relative;
+        }
+
+        .input-group-text {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            border: none;
+            background: none;
+            color: #999;
+            z-index: 10;
+            cursor: pointer;
+        }
+
+        .form-control.with-icon {
+            padding-left: 45px;
+        }
+
+        .btn-login {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            padding: 12px 30px;
+            font-size: 16px;
+            font-weight: 500;
+            width: 100%;
+            transition: all 0.3s;
+            margin-top: 20px;
+        }
+
+        .btn-login:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+            color: white;
+        }
+
+        .btn-login:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .api-key-type {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .type-btn {
+            flex: 1;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            background: white;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: center;
+            font-size: 14px;
+        }
+
+        .type-btn:hover {
+            border-color: #667eea;
+        }
+
+        .type-btn.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-color: transparent;
+        }
+
+        .type-btn i {
+            display: block;
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+
+        .info-box {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            color: #666;
+            border-right: 4px solid #667eea;
+        }
+
+        .info-box i {
+            color: #667eea;
+            margin-left: 5px;
+        }
+
+        .remember-me {
+            display: flex;
+            align-items: center;
+            margin-top: 15px;
+            font-size: 14px;
+        }
+
+        .remember-me input {
+            margin-left: 8px;
+        }
+
+        .footer-links {
+            text-align: center;
+            margin-top: 25px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .footer-links a {
+            color: #667eea;
+            text-decoration: none;
+            font-size: 13px;
+            margin: 0 10px;
+            transition: color 0.3s;
+        }
+
+        .footer-links a:hover {
+            color: #764ba2;
+            text-decoration: underline;
+        }
+
+        .spinner-border {
+            width: 20px;
+            height: 20px;
+            border-width: 2px;
+            margin-left: 10px;
+        }
+
+        .error-message {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            color: #856404;
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 15px;
+            font-size: 13px;
+            display: none;
+        }
+
+        .error-message.show {
+            display: block;
+            animation: shake 0.5s;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            75% { transform: translateX(10px); }
+        }
+
+        /* Responsive */
+        @media (max-width: 480px) {
+            .login-container {
+                margin: 20px;
+            }
+
+            .login-header {
+                padding: 30px 20px;
+            }
+
+            .login-body {
+                padding: 30px 20px;
+            }
+        }
+
+        /* Loading overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+
+        .loading-overlay.show {
+            display: flex;
+        }
+
+        .loading-content {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+        }
+
+        .loading-content .spinner-border {
+            width: 50px;
+            height: 50px;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+<div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-content">
+        <div class="spinner-border text-primary" role="status"></div>
+        <p>در حال بررسی...</p>
+    </div>
+</div>
+
+<div class="login-container">
+    <div class="login-header">
+        <i class="fab fa-telegram"></i>
+        <h2>پنل مدیریت</h2>
+        <p>Telegram Channel Manager v2.2</p>
+    </div>
+
+    <div class="login-body">
+        <div class="info-box">
+            <i class="fas fa-info-circle"></i>
+            برای ورود به پنل، از کلید API خود استفاده کنید
+        </div>
+
+        <div class="api-key-type">
+            <button class="type-btn active" id="normalKeyBtn" onclick="selectKeyType('normal')">
+                <i class="fas fa-key"></i>
+                <span>API Key</span>
+            </button>
+            <button class="type-btn" id="masterKeyBtn" onclick="selectKeyType('master')">
+                <i class="fas fa-crown"></i>
+                <span>Master Key</span>
+            </button>
+        </div>
+
+        <form id="loginForm" onsubmit="handleLogin(event)">
+            <div class="form-group">
+                <label class="form-label" id="keyLabel">
+                    <i class="fas fa-key"></i> کلید API
+                </label>
+                <div class="input-group">
+                        <span class="input-group-text" onclick="togglePasswordVisibility()">
+                            <i class="fas fa-eye" id="eyeIcon"></i>
+                        </span>
+                    <input type="password"
+                           class="form-control with-icon"
+                           id="apiKey"
+                           placeholder="کلید API خود را وارد کنید"
+                           required
+                           autocomplete="off">
+                </div>
+            </div>
+
+            <div class="remember-me">
+                <input type="checkbox" id="rememberMe">
+                <label for="rememberMe">مرا به خاطر بسپار</label>
+            </div>
+
+            <div class="error-message" id="errorMessage"></div>
+
+            <button type="submit" class="btn btn-login" id="loginBtn">
+                <span id="btnText">ورود به پنل</span>
+                <span class="spinner-border text-light" id="btnSpinner" style="display: none;"></span>
+            </button>
+        </form>
+
+        <div class="footer-links">
+            <a href="#" onclick="showHelp()">
+                <i class="fas fa-question-circle"></i> راهنما
+            </a>
+            <a href="/api-docs" target="_blank">
+                <i class="fas fa-book"></i> مستندات API
+            </a>
+            <a href="#" onclick="showRecovery()">
+                <i class="fas fa-undo"></i> بازیابی کلید
+            </a>
+        </div>
+    </div>
+</div>
+
+<script>
+    let keyType = 'normal';
+    let isPasswordVisible = false;
+
+    // Check if already logged in
+    window.addEventListener('DOMContentLoaded', () => {
+        const savedKey = localStorage.getItem('apiKey');
+        if (savedKey) {
+            // Verify the key is still valid
+            verifyAndRedirect(savedKey);
+        }
+
+        // Load saved key if remember me was checked
+        const rememberedKey = localStorage.getItem('rememberedApiKey');
+        if (rememberedKey) {
+            document.getElementById('apiKey').value = rememberedKey;
+            document.getElementById('rememberMe').checked = true;
+        }
+
+        // Focus on input
+        document.getElementById('apiKey').focus();
+    });
+
+    function selectKeyType(type) {
+        keyType = type;
+
+        // Update UI
+        document.querySelectorAll('.type-btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+
+        if (type === 'master') {
+            document.getElementById('masterKeyBtn').classList.add('active');
+            document.getElementById('keyLabel').innerHTML = '<i class="fas fa-crown"></i> Master Key';
+            document.getElementById('apiKey').placeholder = 'Master Key خود را وارد کنید';
+        } else {
+            document.getElementById('normalKeyBtn').classList.add('active');
+            document.getElementById('keyLabel').innerHTML = '<i class="fas fa-key"></i> کلید API';
+            document.getElementById('apiKey').placeholder = 'کلید API خود را وارد کنید';
+        }
+    }
+
+    function togglePasswordVisibility() {
+        const input = document.getElementById('apiKey');
+        const icon = document.getElementById('eyeIcon');
+
+        if (isPasswordVisible) {
+            input.type = 'password';
+            icon.className = 'fas fa-eye';
+            isPasswordVisible = false;
+        } else {
+            input.type = 'text';
+            icon.className = 'fas fa-eye-slash';
+            isPasswordVisible = true;
+        }
+    }
+
+    async function handleLogin(event) {
+        event.preventDefault();
+
+        const apiKey = document.getElementById('apiKey').value.trim();
+        const rememberMe = document.getElementById('rememberMe').checked;
+
+        if (!apiKey) {
+            showError('لطفا کلید API خود را وارد کنید');
+            return;
+        }
+
+        // Show loading
+        setLoading(true);
+        hideError();
+
+        try {
+            // Test the API key
+            const response = await fetch('/api/session/status', {
+                headers: {
+                    'x-api-key': apiKey
+                }
+            });
+
+            if (response.ok) {
+                // Key is valid
+                localStorage.setItem('apiKey', apiKey);
+
+                // Save for remember me
+                if (rememberMe) {
+                    localStorage.setItem('rememberedApiKey', apiKey);
+                } else {
+                    localStorage.removeItem('rememberedApiKey');
+                }
+
+                // Show success message
+                await Swal.fire({
+                    icon: 'success',
+                    title: 'ورود موفق',
+                    text: 'در حال انتقال به پنل مدیریت...',
+                    timer: 1500,
+                    timerProgressBar: true,
+                    showConfirmButton: false
+                });
+
+                // Redirect to admin panel
+                window.location.href = '/admin';
+
+            } else if (response.status === 401) {
+                showError('کلید API نامعتبر است');
+            } else if (response.status === 403) {
+                showError('دسترسی به این بخش ندارید');
+            } else {
+                showError('خطا در ارتباط با سرور');
+            }
+
+        } catch (error) {
+            console.error('Login error:', error);
+            showError('خطا در ارتباط با سرور. لطفا دوباره تلاش کنید');
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    async function verifyAndRedirect(apiKey) {
+        try {
+            const response = await fetch('/api/session/status', {
+                headers: {
+                    'x-api-key': apiKey
+                }
+            });
+
+            if (response.ok) {
+                // Key is still valid, redirect
+                window.location.href = '/admin';
+            } else {
+                // Key is invalid, remove it
+                localStorage.removeItem('apiKey');
+            }
+        } catch (error) {
+            console.error('Verification error:', error);
+        }
+    }
+
+    function setLoading(loading) {
+        const btn = document.getElementById('loginBtn');
+        const btnText = document.getElementById('btnText');
+        const btnSpinner = document.getElementById('btnSpinner');
+        const input = document.getElementById('apiKey');
+
+        if (loading) {
+            btn.disabled = true;
+            btnText.style.display = 'none';
+            btnSpinner.style.display = 'inline-block';
+            input.disabled = true;
+        } else {
+            btn.disabled = false;
+            btnText.style.display = 'inline';
+            btnSpinner.style.display = 'none';
+            input.disabled = false;
+        }
+    }
+
+    function showError(message) {
+        const errorDiv = document.getElementById('errorMessage');
+        errorDiv.textContent = message;
+        errorDiv.classList.add('show');
+
+        // Auto hide after 5 seconds
+        setTimeout(() => {
+            hideError();
+        }, 5000);
+    }
+
+    function hideError() {
+        const errorDiv = document.getElementById('errorMessage');
+        errorDiv.classList.remove('show');
+    }
+
+    async function showHelp() {
+        await Swal.fire({
+            title: 'راهنمای ورود',
+            html: `
+                    <div class="text-end">
+                        <h5>نحوه دریافت API Key:</h5>
+                        <ol style="text-align: right;">
+                            <li>از Master Key برای ورود به پنل استفاده کنید</li>
+                            <li>وارد بخش "کلیدهای API" شوید</li>
+                            <li>کلید جدید ایجاد کنید</li>
+                            <li>کلید را کپی و ذخیره کنید</li>
+                        </ol>
+
+                        <hr>
+
+                        <h5>Master Key پیش‌فرض:</h5>
+                        <p>در اولین اجرا، Master Key در لاگ‌های سرور نمایش داده می‌شود</p>
+                        <p>یا از فایل <code>.env</code> استفاده کنید:</p>
+                        <code>MASTER_API_KEY=your_master_key</code>
+                    </div>
+                `,
+            icon: 'info',
+            confirmButtonText: 'متوجه شدم',
+            confirmButtonColor: '#667eea'
+        });
+    }
+
+    async function showRecovery() {
+        const { value: formValues } = await Swal.fire({
+            title: 'بازیابی API Key',
+            html: `
+                    <input id="recovery-name" class="swal2-input" placeholder="نام کلید API" style="direction: ltr;">
+                    <input id="recovery-token" class="swal2-input" placeholder="Recovery Token" style="direction: ltr;">
+                `,
+            focusConfirm: false,
+            showCancelButton: true,
+            confirmButtonText: 'بازیابی',
+            cancelButtonText: 'انصراف',
+            confirmButtonColor: '#667eea',
+            preConfirm: () => {
+                const name = document.getElementById('recovery-name').value;
+                const token = document.getElementById('recovery-token').value;
+
+                if (!name || !token) {
+                    Swal.showValidationMessage('لطفا هر دو فیلد را پر کنید');
+                    return false;
+                }
+
+                return { name, token };
+            }
+        });
+
+        if (formValues) {
+            try {
+                const response = await fetch('/api/keys/recover', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formValues)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    await Swal.fire({
+                        icon: 'success',
+                        title: 'بازیابی موفق',
+                        html: `
+                                <p>کلید API جدید شما:</p>
+                                <div style="background: #f0f0f0; padding: 10px; border-radius: 5px; word-break: break-all; direction: ltr; font-family: monospace;">
+                                    ${result.apiKey}
+                                </div>
+                                <p class="mt-3">این کلید را کپی و در جای امن ذخیره کنید</p>
+                            `,
+                        confirmButtonText: 'کپی شد',
+                        confirmButtonColor: '#667eea'
+                    });
+
+                    // Auto fill the recovered key
+                    document.getElementById('apiKey').value = result.apiKey;
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'خطا',
+                        text: result.error || 'بازیابی انجام نشد',
+                        confirmButtonColor: '#667eea'
+                    });
+                }
+            } catch (error) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'خطا',
+                    text: 'خطا در ارتباط با سرور',
+                    confirmButtonColor: '#667eea'
+                });
+            }
+        }
+    }
+
+    // Handle Enter key
+    document.getElementById('apiKey').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            handleLogin(e);
+        }
+    });
+</script>
+</body>
+</html>

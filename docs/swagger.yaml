@@ -1,0 +1,1165 @@
+openapi: 3.0.3
+info:
+  title: Telegram Channel Manager API
+  description: |
+    # 🚀 Telegram Channel Manager v2.2
+    
+    سیستم حرفه‌ای مدیریت کانال‌های تلگرام با قابلیت‌های پیشرفته
+    
+    ## 🔑 احراز هویت
+    تمام endpoint ها نیاز به کلید API دارند که باید در header ارسال شود:
+    ```
+    x-api-key: your_api_key_here
+    ```
+    
+    ### دریافت کلید API
+    1. با Master Key به `/api/keys/generate` درخواست POST بدید
+    2. کلید API و Recovery Token رو ذخیره کنید
+    3. در صورت گم شدن کلید، با Recovery Token می‌تونید بازیابی کنید
+    
+    ## ⚡ محدودیت‌های Rate Limit
+    | عملیات | محدودیت | پنجره زمانی |
+    |--------|----------|-------------|
+    | Join Channel | 5 | دقیقه |
+    | Leave Channel | 10 | دقیقه |
+    | Channel Info | 30 | دقیقه |
+    | Channel List | 10 | دقیقه |
+    | Cleanup | 2 | ساعت |
+    | Global | 100 | دقیقه |
+    
+    ## 📊 Session Management
+    سشن‌ها از فایل `sessions.json` خوانده می‌شوند (مسیر قابل تنظیم در `SESSIONS_FILE_PATH`)
+    
+    ## 🔄 Response Codes
+    - `200` - Success
+    - `400` - Bad Request
+    - `401` - Unauthorized (Invalid API Key)
+    - `403` - Forbidden (No Permission)
+    - `429` - Rate Limit Exceeded
+    - `500` - Internal Server Error
+    - `503` - Service Unavailable
+
+  version: 2.2.0
+  contact:
+    name: Support Team
+    email: support@telegram-manager.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:3000
+    description: Development Server
+  - url: https://api.telegram-manager.com
+    description: Production Server
+  - url: http://localhost:3000
+    description: Docker Container
+
+tags:
+  - name: Public
+    description: عمومی - بدون احراز هویت
+  - name: Authentication
+    description: مدیریت کلیدهای API و احراز هویت
+  - name: Sessions
+    description: مدیریت سشن‌های تلگرام
+  - name: Session Auth
+    description: ایجاد و احراز هویت سشن جدید
+  - name: Channels
+    description: عملیات کانال‌ها
+  - name: Monitoring
+    description: مانیتورینگ و آمار
+  - name: RateLimit
+    description: مدیریت محدودیت‌ها
+  - name: Admin
+    description: عملیات مدیریتی
+
+security:
+  - ApiKeyAuth: []
+
+paths:
+  # ═══════════════════════════════════════
+  # Public Endpoints (No Auth Required)
+  # ═══════════════════════════════════════
+
+  /:
+    get:
+      tags: [Public]
+      summary: Root - Redirect to Login
+      description: Redirects to login page
+      security: []
+      responses:
+        '302':
+          description: Redirect to /login
+          headers:
+            Location:
+              schema:
+                type: string
+                example: "/login"
+
+  /login:
+    get:
+      tags: [Public]
+      summary: Login Page
+      description: Returns the login HTML page
+      security: []
+      responses:
+        '200':
+          description: Login page HTML
+          content:
+            text/html:
+              schema:
+                type: string
+
+  /admin:
+    get:
+      tags: [Public]
+      summary: Admin Panel
+      description: Admin panel (requires client-side auth check)
+      security: []
+      responses:
+        '200':
+          description: Admin panel HTML
+          content:
+            text/html:
+              schema:
+                type: string
+
+  /api:
+    get:
+      tags: [Public]
+      summary: API Information
+      description: Get basic API information and available endpoints
+      security: []
+      responses:
+        '200':
+          description: API information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                    example: "Telegram Channel Manager API"
+                  version:
+                    type: string
+                    example: "2.2.0"
+                  status:
+                    type: string
+                    example: "operational"
+                  endpoints:
+                    type: object
+
+  /health:
+    get:
+      tags: [Public]
+      summary: Health Check
+      description: Check system health and service status
+      security: []
+      responses:
+        '200':
+          description: System health status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [healthy, degraded, critical]
+                  timestamp:
+                    type: string
+                    format: date-time
+                  uptime:
+                    type: number
+                  services:
+                    type: object
+
+  /metrics:
+    get:
+      tags: [Public]
+      summary: Prometheus Metrics
+      description: Get metrics in Prometheus format
+      security: []
+      responses:
+        '200':
+          description: Prometheus formatted metrics
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /api-docs:
+    get:
+      tags: [Public]
+      summary: API Documentation
+      description: Swagger UI documentation
+      security: []
+      responses:
+        '200':
+          description: Swagger UI interface
+
+  # ═══════════════════════════════════════
+  # Authentication & API Keys
+  # ═══════════════════════════════════════
+
+  /api/keys/generate:
+    post:
+      tags: [Authentication]
+      summary: Generate API Key
+      description: Generate new API key with recovery token (Master key required)
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  example: "Production API Key"
+                description:
+                  type: string
+                  example: "Key for production environment"
+      responses:
+        '200':
+          description: API key created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  apiKey:
+                    type: string
+                    description: "Save this - shown only once!"
+                  recoveryToken:
+                    type: string
+                    description: "Use this to recover lost API key"
+                  id:
+                    type: integer
+                  name:
+                    type: string
+                  message:
+                    type: string
+
+  /api/keys/recover:
+    post:
+      tags: [Authentication]
+      summary: Recover API Key
+      description: Recover lost API key using recovery token (PUBLIC - no auth needed)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, recoveryToken]
+              properties:
+                name:
+                  type: string
+                  example: "Production API Key"
+                recoveryToken:
+                  type: string
+                  example: "recovery123..."
+      responses:
+        '200':
+          description: API key recovered
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  apiKey:
+                    type: string
+                  message:
+                    type: string
+
+  /api/keys/list:
+    get:
+      tags: [Authentication]
+      summary: List API Keys
+      description: Get list of all API keys (Master key required)
+      security:
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: List of API keys
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  count:
+                    type: integer
+                  keys:
+                    type: array
+                    items:
+                      type: object
+
+  /api/keys/{keyId}:
+    delete:
+      tags: [Authentication]
+      summary: Revoke API Key
+      description: Revoke/delete an API key (Master key required)
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: keyId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Key revoked successfully
+
+  # ═══════════════════════════════════════
+  # Session Authentication (NEW ENDPOINTS)
+  # ═══════════════════════════════════════
+
+  /api/session/auth/initialize:
+    post:
+      tags: [Session Auth]
+      summary: Initialize Session Creation
+      description: Start the process of creating a new Telegram session
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sessionName, phoneNumber]
+              properties:
+                sessionName:
+                  type: string
+                  example: "session_1"
+                phoneNumber:
+                  type: string
+                  example: "+989121234567"
+                isPremium:
+                  type: boolean
+                  default: false
+      responses:
+        '200':
+          description: Session initialized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  sessionId:
+                    type: string
+                  message:
+                    type: string
+                  nextStep:
+                    type: string
+                    example: "requestCode"
+
+  /api/session/auth/request-code:
+    post:
+      tags: [Session Auth]
+      summary: Request Verification Code
+      description: Request verification code to be sent to Telegram
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sessionId]
+              properties:
+                sessionId:
+                  type: string
+      responses:
+        '200':
+          description: Code sent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  nextStep:
+                    type: string
+                  codeLength:
+                    type: integer
+
+  /api/session/auth/submit-code:
+    post:
+      tags: [Session Auth]
+      summary: Submit Verification Code
+      description: Submit the verification code received from Telegram
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sessionId, code]
+              properties:
+                sessionId:
+                  type: string
+                code:
+                  type: string
+                  example: "12345"
+      responses:
+        '200':
+          description: Code verified
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  requiresPassword:
+                    type: boolean
+                  session:
+                    type: object
+
+  /api/session/auth/submit-password:
+    post:
+      tags: [Session Auth]
+      summary: Submit 2FA Password
+      description: Submit two-factor authentication password
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sessionId, password]
+              properties:
+                sessionId:
+                  type: string
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Session created successfully
+
+  /api/session/auth/cancel:
+    post:
+      tags: [Session Auth]
+      summary: Cancel Session Creation
+      description: Cancel the ongoing session creation process
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sessionId]
+              properties:
+                sessionId:
+                  type: string
+      responses:
+        '200':
+          description: Session creation cancelled
+
+  /api/session/save:
+    post:
+      tags: [Sessions, Admin]
+      summary: Save Session
+      description: Save created session to file and activate it (Admin only)
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, sessionString]
+              properties:
+                name:
+                  type: string
+                sessionString:
+                  type: string
+                isPremium:
+                  type: boolean
+                phoneNumber:
+                  type: string
+                username:
+                  type: string
+                fullName:
+                  type: string
+                userId:
+                  type: string
+      responses:
+        '200':
+          description: Session saved and activated
+
+  # ═══════════════════════════════════════
+  # Session Management
+  # ═══════════════════════════════════════
+
+  /api/session/status:
+    get:
+      tags: [Sessions]
+      summary: Get Sessions Status
+      description: Get detailed status of all Telegram sessions
+      security:
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Sessions status information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+
+  /api/session/capacity:
+    get:
+      tags: [Sessions]
+      summary: Get Capacity Statistics
+      description: Get system capacity and usage statistics
+      security:
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Capacity statistics
+
+  /api/session/pool-stats:
+    get:
+      tags: [Sessions]
+      summary: Get Session Pool Statistics
+      description: Get advanced session pool statistics including load distribution
+      security:
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Pool statistics
+
+  /api/session/add:
+    post:
+      tags: [Sessions, Admin]
+      summary: Add New Session
+      description: Add new Telegram session (Master key required)
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, sessionString]
+              properties:
+                name:
+                  type: string
+                sessionString:
+                  type: string
+                isPremium:
+                  type: boolean
+      responses:
+        '200':
+          description: Session added
+
+  /api/session/{sessionName}/reconnect:
+    post:
+      tags: [Sessions]
+      summary: Reconnect Session
+      description: Attempt to reconnect a disconnected session
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: sessionName
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Reconnection result
+
+  /api/session/{sessionName}/channels:
+    get:
+      tags: [Sessions]
+      summary: Get Session Channels
+      description: Get list of channels for a specific session
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: sessionName
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of channels for the session
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  session:
+                    type: object
+                  totalChannels:
+                    type: integer
+                  channels:
+                    type: array
+                    items:
+                      type: object
+                  summary:
+                    type: object
+
+  /api/session/{sessionName}/channels/filter:
+    post:
+      tags: [Sessions]
+      summary: Filter Session Channels
+      description: Filter and sort channels for a specific session
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: sessionName
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                sortBy:
+                  type: string
+                  enum: [participants, title, unread, lastMessage]
+                  default: participants
+                sortOrder:
+                  type: string
+                  enum: [asc, desc]
+                  default: desc
+                filterPublic:
+                  type: boolean
+                minParticipants:
+                  type: integer
+                maxParticipants:
+                  type: integer
+                search:
+                  type: string
+                limit:
+                  type: integer
+                offset:
+                  type: integer
+                  default: 0
+      responses:
+        '200':
+          description: Filtered channels list
+
+  /api/session/{sessionName}/channels/leave-multiple:
+    post:
+      tags: [Sessions]
+      summary: Leave Multiple Channels
+      description: Leave multiple channels from a specific session
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: sessionName
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [channelIds]
+              properties:
+                channelIds:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: Channels left successfully
+
+  # ═══════════════════════════════════════
+  # Channel Operations
+  # ═══════════════════════════════════════
+
+  /api/channel/join:
+    post:
+      tags: [Channels]
+      summary: Join Channel
+      description: |
+        Join a Telegram channel/group
+        
+        **Rate Limit:** 5 requests per minute
+        
+        **Supported formats:**
+        - Username: `@channelname`
+        - Public link: `https://t.me/channelname`
+        - Private invite: `https://t.me/joinchat/ABCD123`
+        - Private invite: `https://t.me/+ABCD123`
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [channel]
+              properties:
+                channel:
+                  type: string
+                  example: "@testchannel"
+      responses:
+        '200':
+          description: Successfully joined channel
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  sessionUsed:
+                    type: string
+                  channelId:
+                    type: string
+                  channelTitle:
+                    type: string
+                  channelUsername:
+                    type: string
+                  sessionCapacity:
+                    type: string
+                  remainingSlots:
+                    type: integer
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+
+  /api/channel/leave:
+    post:
+      tags: [Channels]
+      summary: Leave Channel
+      description: |
+        Leave a Telegram channel
+        
+        **Rate Limit:** 10 requests per minute
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [channelId]
+              properties:
+                channelId:
+                  type: string
+                  example: "-1001234567890"
+                sessionName:
+                  type: string
+                  description: Optional - specific session to use
+      responses:
+        '200':
+          description: Successfully left channel
+
+  /api/channel/info:
+    get:
+      tags: [Channels]
+      summary: Get Channel Information
+      description: |
+        Get detailed information about a channel
+        
+        **Rate Limit:** 30 requests per minute
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: channel
+          in: query
+          required: true
+          schema:
+            type: string
+          example: "@testchannel"
+      responses:
+        '200':
+          description: Channel information
+
+  /api/channel/list:
+    get:
+      tags: [Channels]
+      summary: List All Channels
+      description: |
+        Get list of all channels across all sessions
+        
+        **Rate Limit:** 10 requests per minute
+      security:
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: List of channels
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                      bySession:
+                        type: object
+
+  /api/channel/analyze:
+    get:
+      tags: [Channels]
+      summary: Analyze Channel
+      description: Get AI-powered analysis of a channel including spam score and quality metrics
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: channel
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Channel analysis results
+
+  /api/channel/cleanup:
+    post:
+      tags: [Channels]
+      summary: Cleanup Inactive Channels
+      description: |
+        Leave inactive or low-quality channels automatically
+        
+        **Rate Limit:** 2 requests per hour
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                days:
+                  type: integer
+                  default: 7
+      responses:
+        '200':
+          description: Cleanup completed
+
+  # ═══════════════════════════════════════
+  # Monitoring & Metrics
+  # ═══════════════════════════════════════
+
+  /api/monitoring/status:
+    get:
+      tags: [Monitoring]
+      summary: Get Monitoring Status
+      description: Get current monitoring service status
+      security:
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Monitoring status
+
+  /api/monitoring/realtime:
+    get:
+      tags: [Monitoring]
+      summary: Get Realtime Metrics
+      description: Get realtime system metrics
+      security:
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Realtime metrics
+
+  /api/monitoring/health:
+    get:
+      tags: [Monitoring]
+      summary: Get Health Report
+      description: Get comprehensive system health report
+      security:
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Health report
+
+  /api/monitoring/history/{type}:
+    get:
+      tags: [Monitoring]
+      summary: Get Historical Data
+      description: Get historical monitoring data
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: type
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [capacity, requests, errors, sessions, all]
+        - name: hours
+          in: query
+          schema:
+            type: integer
+            default: 24
+      responses:
+        '200':
+          description: Historical data
+
+  /api/monitoring/alerts:
+    get:
+      tags: [Monitoring]
+      summary: Get System Alerts
+      description: Get active system alerts and warnings
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        '200':
+          description: List of alerts
+
+  # ═══════════════════════════════════════
+  # Rate Limiting
+  # ═══════════════════════════════════════
+
+  /api/ratelimit/status:
+    get:
+      tags: [RateLimit]
+      summary: Get Rate Limit Status
+      description: Check current rate limit status for your API key
+      security:
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Rate limit status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      client:
+                        type: string
+                      limits:
+                        type: object
+                      currentTime:
+                        type: string
+                        format: date-time
+
+  /api/ratelimit/reset:
+    post:
+      tags: [RateLimit, Admin]
+      summary: Reset Rate Limit
+      description: Reset rate limit for specific key (Master key required)
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [key]
+              properties:
+                key:
+                  type: string
+                operation:
+                  type: string
+      responses:
+        '200':
+          description: Rate limit reset
+
+  /api/ratelimit/predict:
+    get:
+      tags: [RateLimit]
+      summary: Predict Optimal Rate
+      description: Get AI-predicted optimal rate for operations
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: operation
+          in: query
+          schema:
+            type: string
+            enum: [join, leave, info, list]
+            default: join
+      responses:
+        '200':
+          description: Rate prediction
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  prediction:
+                    type: object
+                    properties:
+                      operation:
+                        type: string
+                      baseRate:
+                        type: integer
+                      optimalRate:
+                        type: integer
+                      waitTime:
+                        type: integer
+                      confidence:
+                        type: number
+                      recommendation:
+                        type: string
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: x-api-key
+      description: |
+        API Key required for authentication
+        
+        Get your key:
+        1. Use master key to call POST /api/keys/generate
+        2. Save the API key and recovery token
+        3. Use the API key in x-api-key header
+
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+
+    RateLimitError:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+        retryAfter:
+          type: integer
+        limit:
+          type: integer
+        remaining:
+          type: integer
+        resetTime:
+          type: string
+          format: date-time
+        operation:
+          type: string
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+        data:
+          type: object
+
+  responses:
+    BadRequest:
+      description: Bad Request - Invalid input
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    Unauthorized:
+      description: Unauthorized - Invalid or missing API key
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    Forbidden:
+      description: Forbidden - No permission for this resource
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    NotFound:
+      description: Not Found - Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    RateLimitExceeded:
+      description: Rate Limit Exceeded
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/RateLimitError'
+
+    InternalError:
+      description: Internal Server Error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    ServiceUnavailable:
+      description: Service Unavailable
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

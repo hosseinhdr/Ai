@@ -1,0 +1,54 @@
+{
+  "name": "telegram-channel-manager",
+  "version": "2.2.0",
+  "description": "Enhanced Telegram Channel Manager with Optimizations",
+  "main": "src/app.js",
+  "type": "module",
+  "scripts": {
+    "docker:build": "docker build -t telegram-manager .",
+    "docker:run": "docker-compose up -d",
+    "docker:logs": "docker-compose logs -f app",
+    "db:setup": "mysql -u root -p < src/database/databaseSchema.sql",
+    "db:update": "mysql -u root -p < src/database/schema-update-v2.sql",
+    "session:create": "node scripts/createSession.js",
+    "session:manage": "node scripts/createSession.js --manage",
+    "session:backup": "cp sessions.json sessions.backup.json",
+    "setup:master": "node scripts/setupMasterKey.js",
+    "setup:master:save": "node scripts/setupMasterKey.js --save",
+    "start": "node --expose-gc --max-old-space-size=2048 src/app.js",
+    "dev": "nodemon --expose-gc --max-old-space-size=2048 src/app.js",
+    "test": "node --expose-gc --experimental-vm-modules node_modules/jest/bin/jest.js"
+  },
+  "keywords": [
+    "telegram",
+    "channel",
+    "manager",
+    "automation"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "bcrypt": "^5.1.1",
+    "compression": "^1.8.1",
+    "cors": "^2.8.5",
+    "crypto": "^1.0.1",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-rate-limit": "^7.1.5",
+    "mysql2": "^3.6.5",
+    "rate-limit-redis": "^4.2.0",
+    "redis": "^4.6.10",
+    "swagger-ui-express": "^5.0.0",
+    "telegram": "^2.19.8",
+    "winston": "^3.11.0",
+    "yamljs": "^0.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "jest": "^29.7.0",
+    "nodemon": "^3.0.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
