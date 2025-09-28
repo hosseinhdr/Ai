@@ -252,8 +252,16 @@
                 <input type="hidden" id="prizeId">
 
                 <div class="form-group">
-                    <label>نام جایزه *</label>
+                    <label>نام جایزه (فارسی) *</label>
                     <input type="text" id="prizeName" required>
+                </div>
+
+                <div class="form-group">
+                    <label>نام انگلیسی (برای UTM) *</label>
+                    <input type="text" id="prizeEnglishName" required
+                           pattern="[a-z0-9-]+"
+                           title="فقط حروف کوچک انگلیسی، اعداد و خط تیره">
+                    <small>مثال: iphone-15-pro یا gift-card-500k</small>
                 </div>
 
                 <div class="form-group">

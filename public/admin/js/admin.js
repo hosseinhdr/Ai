@@ -91,6 +91,7 @@ class AdminDashboard {
         const prizeForm = document.getElementById('prizeForm');
         if (prizeForm) {
             prizeForm.addEventListener('submit', (e) => {
+                e.preventDefault();
                 this.savePrize(e);
             });
         }
@@ -382,6 +383,8 @@ class AdminDashboard {
                 </td>
                 <td>${user.prize_name || user.prize || '-'}</td>
                 <td>${user.prize_code || '-'}</td>
+                <td>${user.utm_source || '-'}</td>
+                <td>${user.utm_campaign || '-'}</td>
                 <td>${this.formatDateTime(user.created_at)}</td>
                 <td>${user.played_at ? this.formatDateTime(user.played_at) : '-'}</td>
             </tr>
@@ -469,6 +472,7 @@ class AdminDashboard {
             return `
                 <tr>
                     <td>${prize.name}</td>
+                    <td>${prize.english_name || '-'}</td>
                     <td>
                         <input type="number" 
                                class="prob-input" 
@@ -489,11 +493,24 @@ class AdminDashboard {
                     </td>
                     <td>
                         <div class="action-buttons">
-                            <button class="btn-sm btn-edit" onclick="dashboard.editPrize(${prize.id})">✏️</button>
-                            <button class="btn-sm btn-toggle" onclick="dashboard.togglePrize(${prize.id}, ${!prize.is_active})">
-                                ${prize.is_active ? '🔒' : '🔓'}
+                            <button class="btn-sm btn-edit" 
+                                    title="ویرایش" 
+                                    onclick="dashboard.editPrize(${prize.id})">
+                                <span class="btn-icon">✏️</span>
+                                <span class="btn-text">ویرایش</span>
                             </button>
-                            <button class="btn-sm btn-delete" onclick="dashboard.deletePrize(${prize.id})">🗑️</button>
+                            <button class="btn-sm btn-toggle" 
+                                    title="${prize.is_active ? 'غیرفعال کردن' : 'فعال کردن'}"
+                                    onclick="dashboard.togglePrize(${prize.id}, ${!prize.is_active})">
+                                <span class="btn-icon">${prize.is_active ? '🔒' : '🔓'}</span>
+                                <span class="btn-text">${prize.is_active ? 'غیرفعال' : 'فعال'}</span>
+                            </button>
+                            <button class="btn-sm btn-delete" 
+                                    title="حذف"
+                                    onclick="dashboard.deletePrize(${prize.id})">
+                                <span class="btn-icon">🗑️</span>
+                                <span class="btn-text">حذف</span>
+                            </button>
                         </div>
                     </td>
                 </tr>
@@ -556,16 +573,17 @@ class AdminDashboard {
         if (prize) {
             document.getElementById('prizeModalTitle').textContent = 'ویرایش جایزه';
             document.getElementById('prizeId').value = prize.id;
-            document.getElementById('prizeName').value = prize.name;
-            document.getElementById('prizeProbability').value = prize.probability;
-            document.getElementById('prizeDisplayOrder').value = prize.displayOrder;
+            document.getElementById('prizeName').value = prize.name || '';
+            document.getElementById('prizeEnglishName').value = prize.englishName || '';
+            document.getElementById('prizeProbability').value = prize.probability || 0.1;
+            document.getElementById('prizeDisplayOrder').value = prize.displayOrder || 0;
             document.getElementById('prizeLink').value = prize.link || '';
             document.getElementById('prizeImage').value = prize.image || '';
             document.getElementById('prizeButtonText').value = prize.buttonText || '';
             document.getElementById('prizePrizeText').value = prize.prizeText || '';
             document.getElementById('prizeCode').value = prize.code || '';
-            document.getElementById('prizeIsEmpty').checked = prize.isEmpty;
-            document.getElementById('prizeIsActive').checked = prize.isActive;
+            document.getElementById('prizeIsEmpty').checked = prize.isEmpty || false;
+            document.getElementById('prizeIsActive').checked = prize.isActive !== undefined ? prize.isActive : true;
         } else {
             document.getElementById('prizeModalTitle').textContent = 'افزودن جایزه جدید';
             form.reset();
@@ -587,6 +605,7 @@ class AdminDashboard {
         const prizeId = document.getElementById('prizeId').value;
         const prizeData = {
             name: document.getElementById('prizeName').value,
+            english_name: document.getElementById('prizeEnglishName').value,
             probability: parseFloat(document.getElementById('prizeProbability').value),
             display_order: parseInt(document.getElementById('prizeDisplayOrder').value),
             link: document.getElementById('prizeLink').value || null,
@@ -597,6 +616,8 @@ class AdminDashboard {
             is_empty: document.getElementById('prizeIsEmpty').checked,
             is_active: document.getElementById('prizeIsActive').checked
         };
+
+        console.log('Saving prize data:', prizeData);
 
         try {
             const url = prizeId

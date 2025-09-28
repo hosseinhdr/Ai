@@ -11,6 +11,10 @@ class User {
         this.prize = data.prize || null; // For backward compatibility
         this.createdAt = data.created_at || new Date();
         this.playedAt = data.played_at || null;
+        // فیلدهای UTM - فقط اگر واقعا وجود داشته باشند
+        this.utmSource = data.utm_source || null;
+        this.utmMedium = data.utm_medium || null;
+        this.utmCampaign = data.utm_campaign || null;
     }
 
     async save() {
@@ -18,9 +22,10 @@ class User {
             if (this.id) {
                 // Update existing user
                 const sql = `
-                    UPDATE users 
-                    SET phone = ?, verification_code = ?, is_verified = ?, 
-                        has_played = ?, prize_id = ?, prize = ?, played_at = ?
+                    UPDATE users
+                    SET phone = ?, verification_code = ?, is_verified = ?,
+                        has_played = ?, prize_id = ?, prize = ?, played_at = ?,
+                        utm_source = ?, utm_medium = ?, utm_campaign = ?
                     WHERE id = ?
                 `;
                 await db.query(sql, [
@@ -31,13 +36,18 @@ class User {
                     this.prizeId,
                     this.prize,
                     this.playedAt,
+                    this.utmSource,
+                    this.utmMedium,
+                    this.utmCampaign,
                     this.id
                 ]);
             } else {
                 // Insert new user
                 const sql = `
-                    INSERT INTO users (phone, verification_code, is_verified, has_played, prize_id, prize, created_at, played_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO users (phone, verification_code, is_verified, has_played,
+                                       prize_id, prize, created_at, played_at,
+                                       utm_source, utm_medium, utm_campaign)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 `;
                 const result = await db.query(sql, [
                     this.phone,
@@ -47,7 +57,10 @@ class User {
                     this.prizeId,
                     this.prize,
                     this.createdAt,
-                    this.playedAt
+                    this.playedAt,
+                    this.utmSource,
+                    this.utmMedium,
+                    this.utmCampaign
                 ]);
                 this.id = result.insertId;
             }
@@ -114,8 +127,48 @@ class User {
         return await this.save();
     }
 
+    // متد جدید برای آپدیت UTM parameters - فقط اگر واقعا وجود داشته باشند
+    async updateUTMParams(utmParams) {
+        if (utmParams && Object.keys(utmParams).length > 0) {
+            // فقط مقادیری که واقعا ارسال شدند رو آپدیت کن
+            if (utmParams.utm_source) {
+                this.utmSource = utmParams.utm_source;
+            }
+            if (utmParams.utm_medium) {
+                this.utmMedium = utmParams.utm_medium;
+            }
+            if (utmParams.utm_campaign) {
+                this.utmCampaign = utmParams.utm_campaign;
+            }
+
+            // فقط اگر حداقل یکی از UTM ها موجود بود، save رو صدا بزن
+            if (this.utmSource || this.utmMedium || this.utmCampaign) {
+                return await this.save();
+            }
+        }
+        return this;
+    }
+
     static generateVerificationCode() {
         return Math.floor(100000 + Math.random() * 900000).toString();
+    }
+
+    // متد برای دریافت UTM parameters - فقط اگر وجود داشته باشند
+    getUTMParams() {
+        // فقط اگر حداقل یکی از UTM ها وجود داشت، برگردون
+        if (this.utmSource || this.utmMedium || this.utmCampaign) {
+            return {
+                utm_source: this.utmSource,
+                utm_medium: this.utmMedium,
+                utm_campaign: this.utmCampaign
+            };
+        }
+        return null;
+    }
+
+    // چک کردن اینکه آیا کاربر UTM دارد
+    hasUTMParams() {
+        return !!(this.utmSource || this.utmMedium || this.utmCampaign);
     }
 }
 

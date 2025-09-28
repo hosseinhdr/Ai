@@ -19,7 +19,33 @@ class LuckyWheel {
         this.resendTimer = null;
         this.resendCountdown = 0;
 
+        // فقط UTM های واقعی رو بگیر
+        this.utmParams = this.getUTMParameters();
+
+        // فقط اگر واقعا UTM داشتیم لاگ کن
+        if (this.utmParams && Object.keys(this.utmParams).length > 0) {
+            console.log('📊 UTM Parameters detected:', this.utmParams);
+        }
+
         this.init();
+    }
+
+    // متد جدید برای دریافت UTM parameters از URL
+    getUTMParameters() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const utmParams = {};
+
+        // فقط UTM های واقعی رو جمع کن
+        const utmSource = urlParams.get('utm_source');
+        const utmMedium = urlParams.get('utm_medium');
+        const utmCampaign = urlParams.get('utm_campaign');
+
+        if (utmSource) utmParams.utm_source = utmSource;
+        if (utmMedium) utmParams.utm_medium = utmMedium;
+        if (utmCampaign) utmParams.utm_campaign = utmCampaign;
+
+        // اگر هیچ UTM ای نبود، null برگردون
+        return Object.keys(utmParams).length > 0 ? utmParams : null;
     }
 
     async init() {
@@ -90,7 +116,6 @@ class LuckyWheel {
                 await this.sendVerificationCode();
             }
         });
-
 
         document.getElementById('closeWin').addEventListener('click', () => {
             this.closeModal(this.winModal);
@@ -599,10 +624,17 @@ class LuckyWheel {
         this.showLoading();
 
         try {
+            const requestBody = { phone };
+
+            // فقط اگر UTM داشتیم، ارسال کن
+            if (this.utmParams) {
+                requestBody.utmParams = this.utmParams;
+            }
+
             const response = await fetch('/api/auth/send-code', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ phone })
+                body: JSON.stringify(requestBody)
             });
 
             const data = await response.json();

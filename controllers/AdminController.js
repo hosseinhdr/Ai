@@ -111,7 +111,7 @@ class AdminController {
             const countResult = await db.queryRaw(countQuery, whereParams);
             const totalCount = countResult[0]?.total || 0;
 
-            // Get users with pagination
+            // Get users with pagination - با اضافه کردن فیلدهای UTM
             let users = [];
             if (totalCount > 0) {
                 const query = `
@@ -124,6 +124,9 @@ class AdminController {
                         u.prize_id,
                         u.created_at,
                         u.played_at,
+                        u.utm_source,
+                        u.utm_medium,
+                        u.utm_campaign,
                         p.name as prize_name,
                         p.code as prize_code,
                         p.is_empty as prize_is_empty
@@ -266,6 +269,7 @@ class AdminController {
                 SELECT
                     p.id,
                     p.name,
+                    p.english_name,
                     p.is_empty,
                     p.probability,
                     p.is_active,
@@ -273,6 +277,8 @@ class AdminController {
                     p.image,
                     p.link,
                     p.code,
+                    p.button_text,
+                    p.prize_text,
                     COUNT(u.id) as win_count,
                     ROUND(
                             CASE
@@ -283,7 +289,8 @@ class AdminController {
                     ) as win_percentage
                 FROM prizes p
                          LEFT JOIN users u ON p.id = u.prize_id
-                GROUP BY p.id, p.name, p.is_empty, p.probability, p.is_active, p.display_order, p.image, p.link, p.code
+                GROUP BY p.id, p.name, p.english_name, p.is_empty, p.probability, p.is_active, 
+                         p.display_order, p.image, p.link, p.code, p.button_text, p.prize_text
                 ORDER BY p.display_order ASC
             `;
 
@@ -354,6 +361,8 @@ class AdminController {
             const { id } = req.params;
             const updateData = req.body;
 
+            console.log('Updating prize:', id, updateData);
+
             // Validate probability if provided
             if (updateData.probability !== undefined) {
                 if (updateData.probability < 0 || updateData.probability > 1) {
@@ -372,8 +381,19 @@ class AdminController {
                 });
             }
 
-            // Update prize fields
-            Object.assign(prize, updateData);
+            // Update prize fields - تمام فیلدها رو آپدیت کن
+            if (updateData.name !== undefined) prize.name = updateData.name;
+            if (updateData.english_name !== undefined) prize.englishName = updateData.english_name;
+            if (updateData.probability !== undefined) prize.probability = updateData.probability;
+            if (updateData.display_order !== undefined) prize.displayOrder = updateData.display_order;
+            if (updateData.link !== undefined) prize.link = updateData.link;
+            if (updateData.image !== undefined) prize.image = updateData.image;
+            if (updateData.button_text !== undefined) prize.buttonText = updateData.button_text;
+            if (updateData.prize_text !== undefined) prize.prizeText = updateData.prize_text;
+            if (updateData.code !== undefined) prize.code = updateData.code;
+            if (updateData.is_empty !== undefined) prize.isEmpty = updateData.is_empty;
+            if (updateData.is_active !== undefined) prize.isActive = updateData.is_active;
+
             await prize.save();
 
             res.json({
@@ -386,7 +406,8 @@ class AdminController {
             console.error('Error updating prize:', error);
             res.status(500).json({
                 success: false,
-                message: 'خطا در بروزرسانی جایزه'
+                message: 'خطا در بروزرسانی جایزه',
+                error: process.env.NODE_ENV === 'development' ? error.message : undefined
             });
         }
     }
@@ -488,6 +509,9 @@ class AdminController {
                     CASE WHEN u.has_played = 1 THEN 'بله' ELSE 'خیر' END as 'شرکت_کرده',
                     IFNULL(p.name, u.prize) as 'جایزه',
                     IFNULL(p.code, '') as 'کد_جایزه',
+                    IFNULL(u.utm_source, '') as 'منبع_ورود',
+                    IFNULL(u.utm_medium, '') as 'مدیوم',
+                    IFNULL(u.utm_campaign, '') as 'کمپین',
                     u.created_at as 'تاریخ_ثبت‌نام',
                     u.played_at as 'تاریخ_بازی'
                 FROM users u

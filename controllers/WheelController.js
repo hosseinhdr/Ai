@@ -25,12 +25,12 @@ class WheelController {
             }
 
             if (user.hasPlayed) {
-                // Get the prize details for already played user
+                // Get the prize details for already played user (با UTM)
                 const previousPrize = await this.prizeService.getPrizeById(user.prizeId);
                 return res.status(403).json({
                     success: false,
                     message: 'شما قبلا در این مسابقه شرکت کرده‌اید',
-                    prize: previousPrize ? previousPrize.toWinnerFormat() : null
+                    prize: previousPrize ? previousPrize.toWinnerFormat(user.getUTMParams()) : null
                 });
             }
 
@@ -50,7 +50,7 @@ class WheelController {
             res.json({
                 success: true,
                 prizeIndex: prizeIndex,
-                prize: selectedPrize.toWinnerFormat(),
+                prize: selectedPrize.toWinnerFormat(user.getUTMParams()),
                 message: selectedPrize.isEmpty ? 'متاسفانه این بار برنده نشدید' : `تبریک! شما برنده ${selectedPrize.name} شدید`
             });
 
@@ -87,7 +87,7 @@ class WheelController {
             if (user.hasPlayed && user.prizeId) {
                 const prize = await this.prizeService.getPrizeById(user.prizeId);
                 if (prize) {
-                    prizeData = prize.toWinnerFormat();
+                    prizeData = prize.toWinnerFormat(user.getUTMParams());
                 }
             }
 

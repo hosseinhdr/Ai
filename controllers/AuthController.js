@@ -10,7 +10,7 @@ class AuthController {
 
     async sendVerificationCode(req, res) {
         try {
-            const { phone } = req.body;
+            const { phone, utmParams } = req.body;
 
             if (!phone || !this.validatePhone(phone)) {
                 return res.status(400).json({
@@ -28,14 +28,29 @@ class AuthController {
             if (user) {
                 // Update existing user
                 user.verificationCode = verificationCode;
+
+                // فقط اگر UTM واقعا وجود داشت، آپدیت کن
+                if (utmParams && Object.keys(utmParams).some(key => utmParams[key])) {
+                    await user.updateUTMParams(utmParams);
+                }
+
                 await user.save();
             } else {
                 // Create new user
-                user = new User({
+                const userData = {
                     phone: phone,
                     verificationCode: verificationCode,
                     isVerified: false
-                });
+                };
+
+                // فقط اگر UTM واقعا وجود داشت، اضافه کن
+                if (utmParams) {
+                    if (utmParams.utm_source) userData.utm_source = utmParams.utm_source;
+                    if (utmParams.utm_medium) userData.utm_medium = utmParams.utm_medium;
+                    if (utmParams.utm_campaign) userData.utm_campaign = utmParams.utm_campaign;
+                }
+
+                user = new User(userData);
                 await user.save();
             }
 
@@ -145,12 +160,14 @@ class AuthController {
                 req.session.phone = user.phone;
                 req.session.isAuthenticated = true;
 
-                // Get full prize data if user has played
+                // Get full prize data if user has played (با UTM فقط اگر کاربر UTM داشته باشد)
                 let prizeData = null;
                 if (user.hasPlayed && user.prizeId) {
                     const prize = await Prize.getById(user.prizeId);
                     if (prize) {
-                        prizeData = prize.toWinnerFormat();
+                        // فقط اگر کاربر UTM داشت، اونها رو پاس بده
+                        const utmParams = user.getUTMParams();
+                        prizeData = prize.toWinnerFormat(utmParams);
                     }
                 } else if (user.hasPlayed && user.prize) {
                     // Fallback for old data format
@@ -206,7 +223,9 @@ class AuthController {
                 if (user.hasPlayed && user.prizeId) {
                     const prize = await Prize.getById(user.prizeId);
                     if (prize) {
-                        prizeData = prize.toWinnerFormat();
+                        // فقط اگر کاربر UTM داشت، اونها رو پاس بده
+                        const utmParams = user.getUTMParams();
+                        prizeData = prize.toWinnerFormat(utmParams);
                     }
                 } else if (user.hasPlayed && user.prize) {
                     // Fallback for old data format
@@ -260,7 +279,9 @@ class AuthController {
             if (user.hasPlayed && user.prizeId) {
                 const prize = await Prize.getById(user.prizeId);
                 if (prize) {
-                    prizeData = prize.toWinnerFormat();
+                    // فقط اگر کاربر UTM داشت، اونها رو پاس بده
+                    const utmParams = user.getUTMParams();
+                    prizeData = prize.toWinnerFormat(utmParams);
                 }
             } else if (user.hasPlayed && user.prize) {
                 // Fallback for old data format

@@ -4,6 +4,7 @@ class Prize {
     constructor(data) {
         this.id = data.id || null;
         this.name = data.name;
+        this.englishName = data.english_name || null;
         this.link = data.link || null;
         this.image = data.image || null;
         this.buttonText = data.button_text || 'دریافت جایزه';
@@ -56,13 +57,14 @@ class Prize {
                 // Update existing prize
                 const sql = `
                     UPDATE prizes 
-                    SET name = ?, link = ?, image = ?, button_text = ?, 
+                    SET name = ?, english_name = ?, link = ?, image = ?, button_text = ?, 
                         prize_text = ?, code = ?, probability = ?, 
                         is_empty = ?, display_order = ?, is_active = ?
                     WHERE id = ?
                 `;
                 await db.query(sql, [
                     this.name,
+                    this.englishName,
                     this.link,
                     this.image,
                     this.buttonText,
@@ -77,12 +79,13 @@ class Prize {
             } else {
                 // Insert new prize
                 const sql = `
-                    INSERT INTO prizes (name, link, image, button_text, prize_text, 
+                    INSERT INTO prizes (name, english_name, link, image, button_text, prize_text, 
                                       code, probability, is_empty, display_order, is_active)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 `;
                 const result = await db.query(sql, [
                     this.name,
+                    this.englishName,
                     this.link,
                     this.image,
                     this.buttonText,
@@ -106,6 +109,7 @@ class Prize {
         return {
             id: this.id,
             name: this.name,
+            englishName: this.englishName,
             link: this.link,
             image: this.image,
             buttonText: this.buttonText,
@@ -127,11 +131,12 @@ class Prize {
         };
     }
 
-    // For winner display - full data
-    toWinnerFormat() {
-        return {
+    // For winner display - با UTM فقط اگر وجود داشته باشد
+    toWinnerFormat(utmParams = null) {
+        const baseData = {
             id: this.id,
             name: this.name,
+            englishName: this.englishName,
             link: this.link,
             image: this.image,
             buttonText: this.buttonText,
@@ -139,6 +144,36 @@ class Prize {
             code: this.code,
             isEmpty: this.isEmpty
         };
+
+        // فقط اگر واقعا UTM وجود داشت و لینک داریم، اضافه کن
+        if (this.link && utmParams && !this.isEmpty) {
+            try {
+                const url = new URL(this.link);
+
+                // فقط UTM هایی که واقعا مقدار دارند رو اضافه کن
+                if (utmParams.utm_source) {
+                    url.searchParams.set('utm_source', utmParams.utm_source);
+                }
+                if (utmParams.utm_medium) {
+                    url.searchParams.set('utm_medium', utmParams.utm_medium);
+                }
+                if (utmParams.utm_campaign) {
+                    url.searchParams.set('utm_campaign', utmParams.utm_campaign);
+                }
+
+                // utm_content فقط اگر نام انگلیسی وجود داشته باشد
+                if (this.englishName) {
+                    url.searchParams.set('utm_content', this.englishName);
+                }
+
+                baseData.link = url.toString();
+            } catch (error) {
+                console.error('Error adding UTM to prize link:', error);
+                // در صورت خطا، لینک اصلی رو برگردون
+            }
+        }
+
+        return baseData;
     }
 }
 
