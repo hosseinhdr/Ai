@@ -356,6 +356,7 @@ class TelegramManager {
         return { success: true, totalLeft, leftChannels };
     }
 
+
     async getSessionsStatus() {
         const status = {
             total: this.sessions.length,
@@ -375,9 +376,25 @@ class TelegramManager {
                 status.inactive++;
             }
 
-            status.totalChannelsUsed += session.currentChannelsCount;
-            status.totalCapacity += session.maxChannels;
-            status.sessions.push(sessionStatus);
+            status.totalChannelsUsed += session.currentChannelsCount || 0;
+            status.totalCapacity += session.maxChannels || 0;
+
+            // اینجا دقیقاً همون فیلد channelsUsed که frontend می‌خواد
+            status.sessions.push({
+                name: sessionStatus.name,
+                connected: sessionStatus.connected,
+                isPremium: sessionStatus.isPremium,
+                maxChannels: sessionStatus.maxChannels,
+
+                // این فیلد مهمه که frontend استفاده می‌کنه
+                channelsUsed: session.currentChannelsCount || 0,
+
+                // بقیه فیلدها
+                usage: sessionStatus.usagePercentage ? `${sessionStatus.usagePercentage}%` : '0%',
+                health: sessionStatus.healthStatus,
+                lastActivity: sessionStatus.lastActivity,
+                lastError: null // اگر خطایی داشته باشید
+            });
         }
 
         return { success: true, data: status };
@@ -390,25 +407,22 @@ class TelegramManager {
         };
 
         for (const session of this.sessions) {
-            stats.total.used += session.currentChannelsCount || 0;
-            stats.total.max += session.maxChannels || 0;
+            const used = session.currentChannelsCount || 0;
+            const max = session.maxChannels || 0;
+
+            stats.total.used += used;
+            stats.total.max += max;
 
             stats.sessions.push({
                 name: session.name,
-                used: session.currentChannelsCount || 0,
-                max: session.maxChannels || 0,
-                percentage: session.maxChannels > 0
-                    ? Math.round((session.currentChannelsCount / session.maxChannels) * 100)
-                    : 0
+                used: used,
+                max: max,
+                percentage: max > 0 ? Math.round((used / max) * 100) : 0
             });
         }
 
         if (stats.total.max > 0) {
             stats.total.percentage = Math.round((stats.total.used / stats.total.max) * 100);
-        }
-
-        if (this.sessionPool) {
-            stats.pool = await this.sessionPool.getPoolStats();
         }
 
         return stats;
