@@ -86,6 +86,15 @@ export class APIServer {
     }
 
     setupRoutes() {
+        // Load Swagger documentation
+        const swaggerDocument = YAML.load(path.join(__dirname, '../../docs/swagger.yaml'));
+
+        // SWAGGER UI ROUTE - این خط اضافه شده
+        this.app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument, {
+            customCss: '.swagger-ui .topbar { display: none }',
+            customSiteTitle: "Telegram Channel Manager API"
+        }));
+
         // API Key validation middleware
         const validateApiKey = async (req, res, next) => {
             const apiKey = req.headers['x-api-key'] || req.query.api_key;
@@ -146,8 +155,36 @@ export class APIServer {
             res.json({
                 name: 'Telegram Channel Manager API',
                 version: '2.2.0',
-                status: 'operational'
+                status: 'operational',
+                documentation: '/api-docs'
             });
+        });
+// Session Management Routes - حذف updateChannelsCount که timeout میکنه
+        this.app.get('/api/session/status', validateApiKey, async (req, res) => {
+            try {
+                // حذف آپدیت کانال‌ها که باعث timeout میشه
+                // فقط وضعیت فعلی رو برگردون
+                const status = await this.telegramManager.getSessionsStatus();
+                res.json(status);
+            } catch (error) {
+                res.status(500).json({
+                    success: false,
+                    error: error.message
+                });
+            }
+        });
+
+        this.app.get('/api/session/capacity', validateApiKey, async (req, res) => {
+            try {
+                // اینجا هم بدون آپدیت
+                const capacity = await this.telegramManager.getCapacityStats();
+                res.json(capacity);
+            } catch (error) {
+                res.status(500).json({
+                    success: false,
+                    error: error.message
+                });
+            }
         });
 
         this.app.get('/health', async (req, res) => {
@@ -165,276 +202,7 @@ export class APIServer {
         // Session Authentication Routes
         this.sessionAuthAPI.setupRoutes(this.app, requireAdmin);
 
-        this.app.get('/api/channel/info',
-            validateApiKey,
-            rateLimiters.info,
-            async (req, res) => {
-                try {
-                    const {
-                        channel,
-                        includePhoto = 'false',
-                        joinIfNeeded = 'true',
-                        leaveAfter = 'false',
-                        forceRefresh = 'false'
-                    } = req.query;
-
-                    logger.info(`Channel info request for: ${channel}`); // اضافه کردن لاگ
-
-                    if (!channel) {
-                        return res.status(400).json({
-                            success: false,
-                            error: 'Channel parameter required'
-                        });
-                    }
-
-                    // Check server-side cache first
-                    const cacheKey = `${channel}_${joinIfNeeded}_${leaveAfter}`;
-                    if (forceRefresh !== 'true' && this.channelInfoCache.has(cacheKey)) {
-                        const cached = this.channelInfoCache.get(cacheKey);
-                        if (Date.now() - cached.timestamp < this.cacheTimeout) {
-                            logger.info(`Returning cached result for ${channel}`);
-
-                            res.set({
-                                'Cache-Control': 'private, max-age=300',
-                                'X-Response-Time': `${Date.now() - req.startTime}ms`,
-                                'X-Cache': 'HIT'
-                            });
-
-                            return res.json(cached.data);
-                        }
-                    }
-
-                    // Parse boolean parameters
-                    const options = {
-                        joinIfNeeded: joinIfNeeded === 'true',
-                        leaveAfter: leaveAfter === 'true',
-                        forceRefresh: forceRefresh === 'true'
-                    };
-
-                    logger.info(`Getting channel info with options:`, options);
-
-                    // Increased timeout to 30 seconds
-                    const timeoutPromise = new Promise((_, reject) => {
-                        setTimeout(() => reject(new Error('Request timeout after 30 seconds')), 30000);
-                    });
-
-                    // Get channel info
-                    const result = await Promise.race([
-                        this.telegramManager.getChannelInfoWithOptions(channel, options),
-                        timeoutPromise
-                    ]);
-
-                    logger.info(`Channel info result:`, result); // اضافه کردن لاگ
-
-                    // بررسی اینکه result واقعاً دیتا دارد
-                    if (!result || !result.data) {
-                        logger.error('Empty result from getChannelInfoWithOptions');
-                        return res.status(500).json({
-                            success: false,
-                            error: 'Failed to get channel information'
-                        });
-                    }
-
-                    // Cache the successful result
-                    this.channelInfoCache.set(cacheKey, {
-                        data: result,
-                        timestamp: Date.now()
-                    });
-
-                    // Clean old cache entries
-                    if (this.channelInfoCache.size > 100) {
-                        const oldestKey = this.channelInfoCache.keys().next().value;
-                        this.channelInfoCache.delete(oldestKey);
-                    }
-
-                    // Convert photo path to accessible URL if exists and requested
-                    if (result.data?.profilePhotoPath && includePhoto === 'true') {
-                        const photoFileName = path.basename(result.data.profilePhotoPath);
-                        result.data.profilePhotoUrl = `/photos/${photoFileName}`;
-                    }
-
-                    // Add response headers
-                    res.set({
-                        'Cache-Control': 'private, max-age=300',
-                        'X-Response-Time': `${Date.now() - req.startTime}ms`,
-                        'X-Cache': 'MISS'
-                    });
-
-                    res.json(result);
-
-                } catch (error) {
-                    logger.error('Channel info error:', error);
-                    logger.error('Stack trace:', error.stack); // اضافه کردن stack trace
-
-                    // Better error messages
-                    let errorMessage = error.message;
-                    let statusCode = 500;
-
-                    if (error.message.includes('timeout')) {
-                        errorMessage = 'Request took too long. The channel might be large or network is slow. Please try again.';
-                        statusCode = 504;
-                    } else if (error.message.includes('FLOOD_WAIT')) {
-                        const waitTime = error.message.match(/\d+/)?.[0] || '60';
-                        errorMessage = `Too many requests. Please wait ${waitTime} seconds.`;
-                        statusCode = 429;
-                    } else if (error.message.includes('CHANNEL_PRIVATE')) {
-                        errorMessage = 'This is a private channel. You need to join first.';
-                        statusCode = 403;
-                    } else if (error.message.includes('CHANNEL_INVALID')) {
-                        errorMessage = 'Invalid channel identifier.';
-                        statusCode = 400;
-                    } else if (error.message.includes('No connected sessions')) {
-                        errorMessage = 'No active sessions available. Please check your sessions.';
-                        statusCode = 503;
-                    }
-
-                    res.status(statusCode).json({
-                        success: false,
-                        error: errorMessage,
-                        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
-                    });
-                }
-            }
-        );
-
-        /**
-         * Clear channel info cache
-         */
-        this.app.post('/api/channel/cache/clear',
-            requireAdmin,
-            (req, res) => {
-                const size = this.channelInfoCache.size;
-                this.channelInfoCache.clear();
-
-                // Also clear session caches
-                this.telegramManager.sessions.forEach(session => {
-                    if (session.clearCache) {
-                        session.clearCache();
-                    }
-                });
-
-                res.json({
-                    success: true,
-                    message: `Cleared ${size} cached entries`
-                });
-            }
-        );
-
-        /**
-         * Get channel photo separately
-         */
-        this.app.get('/api/channel/photo/:channelId',
-            validateApiKey,
-            async (req, res) => {
-                try {
-                    const { channelId } = req.params;
-
-                    if (!channelId) {
-                        return res.status(400).json({
-                            success: false,
-                            error: 'Channel ID required'
-                        });
-                    }
-
-                    const result = await this.telegramManager.getChannelPhoto(channelId);
-
-                    if (result.success && result.photoPath) {
-                        res.sendFile(result.photoPath);
-                    } else {
-                        res.status(404).json({
-                            success: false,
-                            error: 'Photo not found'
-                        });
-                    }
-
-                } catch (error) {
-                    logger.error('Get photo error:', error);
-                    res.status(500).json({
-                        success: false,
-                        error: error.message
-                    });
-                }
-            }
-        );
-
-        /**
-         * Batch get channel info
-         */
-        this.app.post('/api/channel/batch-info',
-            validateApiKey,
-            rateLimiters.info,
-            async (req, res) => {
-                try {
-                    const {
-                        channels,
-                        joinIfNeeded = false,
-                        leaveAfter = false
-                    } = req.body;
-
-                    if (!channels || !Array.isArray(channels)) {
-                        return res.status(400).json({
-                            success: false,
-                            error: 'Channels array required'
-                        });
-                    }
-
-                    const results = [];
-
-                    for (const channel of channels) {
-                        try {
-                            // Check cache first
-                            const cacheKey = `${channel}_${joinIfNeeded}_${leaveAfter}`;
-                            if (this.channelInfoCache.has(cacheKey)) {
-                                const cached = this.channelInfoCache.get(cacheKey);
-                                if (Date.now() - cached.timestamp < this.cacheTimeout) {
-                                    results.push(cached.data);
-                                    continue;
-                                }
-                            }
-
-                            const result = await this.telegramManager.getChannelInfoWithOptions(channel, {
-                                joinIfNeeded,
-                                leaveAfter
-                            });
-
-                            // Cache result
-                            this.channelInfoCache.set(cacheKey, {
-                                data: result,
-                                timestamp: Date.now()
-                            });
-
-                            results.push(result);
-
-                            // Small delay to avoid rate limits
-                            await new Promise(resolve => setTimeout(resolve, 500));
-                        } catch (error) {
-                            results.push({
-                                success: false,
-                                channel: channel,
-                                error: error.message
-                            });
-                        }
-                    }
-
-                    res.json({
-                        success: true,
-                        results: results,
-                        total: channels.length,
-                        successful: results.filter(r => r.success).length,
-                        failed: results.filter(r => !r.success).length
-                    });
-
-                } catch (error) {
-                    logger.error('Batch info error:', error);
-                    res.status(500).json({
-                        success: false,
-                        error: error.message
-                    });
-                }
-            }
-        );
-
-        // Session and Channel Management Routes
+        // Session Management Routes
         this.app.get('/api/session/status', validateApiKey, async (req, res) => {
             try {
                 const status = await this.telegramManager.getSessionsStatus();
@@ -459,6 +227,7 @@ export class APIServer {
             }
         });
 
+        // Channel Operations
         this.app.post('/api/channel/join',
             validateApiKey,
             rateLimiters.join,
@@ -522,6 +291,136 @@ export class APIServer {
                     res.status(500).json({
                         success: false,
                         error: error.message
+                    });
+                }
+            }
+        );
+
+        this.app.get('/api/channel/info',
+            validateApiKey,
+            rateLimiters.info,
+            async (req, res) => {
+                try {
+                    const {
+                        channel,
+                        includePhoto = 'false',
+                        joinIfNeeded = 'true',
+                        leaveAfter = 'false',
+                        forceRefresh = 'false'
+                    } = req.query;
+
+                    logger.info(`Channel info request for: ${channel}`);
+
+                    if (!channel) {
+                        return res.status(400).json({
+                            success: false,
+                            error: 'Channel parameter required'
+                        });
+                    }
+
+                    // Check server-side cache first
+                    const cacheKey = `${channel}_${joinIfNeeded}_${leaveAfter}`;
+                    if (forceRefresh !== 'true' && this.channelInfoCache.has(cacheKey)) {
+                        const cached = this.channelInfoCache.get(cacheKey);
+                        if (Date.now() - cached.timestamp < this.cacheTimeout) {
+                            logger.info(`Returning cached result for ${channel}`);
+
+                            res.set({
+                                'Cache-Control': 'private, max-age=300',
+                                'X-Response-Time': `${Date.now() - req.startTime}ms`,
+                                'X-Cache': 'HIT'
+                            });
+
+                            return res.json(cached.data);
+                        }
+                    }
+
+                    // Parse boolean parameters
+                    const options = {
+                        joinIfNeeded: joinIfNeeded === 'true',
+                        leaveAfter: leaveAfter === 'true',
+                        forceRefresh: forceRefresh === 'true'
+                    };
+
+                    logger.info(`Getting channel info with options:`, options);
+
+                    // Increased timeout to 30 seconds
+                    const timeoutPromise = new Promise((_, reject) => {
+                        setTimeout(() => reject(new Error('Request timeout after 30 seconds')), 30000);
+                    });
+
+                    // Get channel info
+                    const result = await Promise.race([
+                        this.telegramManager.getChannelInfoWithOptions(channel, options),
+                        timeoutPromise
+                    ]);
+
+                    logger.info(`Channel info result:`, result);
+
+                    if (!result || !result.data) {
+                        logger.error('Empty result from getChannelInfoWithOptions');
+                        return res.status(500).json({
+                            success: false,
+                            error: 'Failed to get channel information'
+                        });
+                    }
+
+                    // Cache the successful result
+                    this.channelInfoCache.set(cacheKey, {
+                        data: result,
+                        timestamp: Date.now()
+                    });
+
+                    // Clean old cache entries
+                    if (this.channelInfoCache.size > 100) {
+                        const oldestKey = this.channelInfoCache.keys().next().value;
+                        this.channelInfoCache.delete(oldestKey);
+                    }
+
+                    // Convert photo path to accessible URL if exists and requested
+                    if (result.data?.profilePhotoPath && includePhoto === 'true') {
+                        const photoFileName = path.basename(result.data.profilePhotoPath);
+                        result.data.profilePhotoUrl = `/photos/${photoFileName}`;
+                    }
+
+                    // Add response headers
+                    res.set({
+                        'Cache-Control': 'private, max-age=300',
+                        'X-Response-Time': `${Date.now() - req.startTime}ms`,
+                        'X-Cache': 'MISS'
+                    });
+
+                    res.json(result);
+
+                } catch (error) {
+                    logger.error('Channel info error:', error);
+                    logger.error('Stack trace:', error.stack);
+
+                    let errorMessage = error.message;
+                    let statusCode = 500;
+
+                    if (error.message.includes('timeout')) {
+                        errorMessage = 'Request took too long. The channel might be large or network is slow. Please try again.';
+                        statusCode = 504;
+                    } else if (error.message.includes('FLOOD_WAIT')) {
+                        const waitTime = error.message.match(/\d+/)?.[0] || '60';
+                        errorMessage = `Too many requests. Please wait ${waitTime} seconds.`;
+                        statusCode = 429;
+                    } else if (error.message.includes('CHANNEL_PRIVATE')) {
+                        errorMessage = 'This is a private channel. You need to join first.';
+                        statusCode = 403;
+                    } else if (error.message.includes('CHANNEL_INVALID')) {
+                        errorMessage = 'Invalid channel identifier.';
+                        statusCode = 400;
+                    } else if (error.message.includes('No connected sessions')) {
+                        errorMessage = 'No active sessions available. Please check your sessions.';
+                        statusCode = 503;
+                    }
+
+                    res.status(statusCode).json({
+                        success: false,
+                        error: errorMessage,
+                        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
                     });
                 }
             }
@@ -602,10 +501,25 @@ export class APIServer {
             connected: this.database?.isConnected || false
         };
 
+        // آپدیت تعداد کانال‌ها برای دقت
         const sessions = this.telegramManager?.sessions || [];
+        let totalChannels = 0;
+        let totalCapacity = 0;
+
+        for (const session of sessions) {
+            if (session.isConnected) {
+                await session.updateChannelsCount();
+                totalChannels += session.currentChannelsCount;
+                totalCapacity += session.maxChannels;
+            }
+        }
+
         health.services.telegram = {
             totalSessions: sessions.length,
-            connectedSessions: sessions.filter(s => s.isConnected).length
+            connectedSessions: sessions.filter(s => s.isConnected).length,
+            totalChannels: totalChannels,
+            totalCapacity: totalCapacity,
+            usagePercentage: totalCapacity > 0 ? Math.round((totalChannels / totalCapacity) * 100) : 0
         };
 
         health.services.monitoring = {
@@ -630,7 +544,6 @@ export class APIServer {
 
         return health;
     }
-
     async start() {
         const port = process.env.API_PORT || 3000;
         const host = process.env.API_HOST || '0.0.0.0';
