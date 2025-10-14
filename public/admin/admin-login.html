@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ورود به پنل مدیریت - صراف</title>
+    <link rel="stylesheet" href="/admin/css/admin-style.css">
+</head>
+<body>
+<div class="login-container">
+    <div class="login-box">
+        <div class="login-header">
+            <h1 class="brand">صراف</h1>
+            <h2>پنل مدیریت</h2>
+        </div>
+
+        <form id="loginForm" class="login-form">
+            <div class="form-group">
+                <label for="username">نام کاربری</label>
+                <input
+                        type="text"
+                        id="username"
+                        name="username"
+                        required
+                        autocomplete="username"
+                        placeholder="نام کاربری را وارد کنید"
+                >
+            </div>
+
+            <div class="form-group">
+                <label for="password">رمز عبور</label>
+                <input
+                        type="password"
+                        id="password"
+                        name="password"
+                        required
+                        autocomplete="current-password"
+                        placeholder="رمز عبور را وارد کنید"
+                >
+            </div>
+
+            <button type="submit" class="btn-login">
+                <span id="btnText">ورود به پنل</span>
+                <span id="btnLoader" class="loader hidden"></span>
+            </button>
+
+            <div id="errorMessage" class="error-message hidden"></div>
+        </form>
+    </div>
+</div>
+
+<script>
+    const loginForm = document.getElementById('loginForm');
+    const errorMessage = document.getElementById('errorMessage');
+    const btnText = document.getElementById('btnText');
+    const btnLoader = document.getElementById('btnLoader');
+    const submitBtn = loginForm.querySelector('.btn-login');
+
+    loginForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
+
+        // Show loading
+        btnText.classList.add('hidden');
+        btnLoader.classList.remove('hidden');
+        submitBtn.disabled = true;
+        errorMessage.classList.add('hidden');
+
+        try {
+            const response = await fetch('/admin/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ username, password })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                window.location.href = '/admin/dashboard';
+            } else {
+                errorMessage.textContent = data.message || 'خطا در ورود';
+                errorMessage.classList.remove('hidden');
+            }
+        } catch (error) {
+            errorMessage.textContent = 'خطا در ارتباط با سرور';
+            errorMessage.classList.remove('hidden');
+        } finally {
+            // Hide loading
+            btnText.classList.remove('hidden');
+            btnLoader.classList.add('hidden');
+            submitBtn.disabled = false;
+        }
+    });
+</script>
+</body>
+</html>

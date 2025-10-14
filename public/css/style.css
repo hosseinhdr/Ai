@@ -1,0 +1,714 @@
+/* تعریف فونت‌های IRANSansX */
+@font-face {
+    font-family: 'IRANSansX';
+    src: url('../fonts/IRANSansX-UltraLight.ttf') format('truetype');
+    font-weight: 200;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'IRANSansX';
+    src: url('../fonts/IRANSansX-Thin.ttf') format('truetype');
+    font-weight: 100;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'IRANSansX';
+    src: url('../fonts/IRANSansX-Light.ttf') format('truetype');
+    font-weight: 300;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'IRANSansX';
+    src: url('../fonts/IRANSansX-Regular.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'IRANSansX';
+    src: url('../fonts/IRANSansX-Medium.ttf') format('truetype');
+    font-weight: 500;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'IRANSansX';
+    src: url('../fonts/IRANSansX-DemiBold.ttf') format('truetype');
+    font-weight: 600;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'IRANSansX';
+    src: url('../fonts/IRANSansX-Bold.ttf') format('truetype');
+    font-weight: 700;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'IRANSansX';
+    src: url('../fonts/IRANSansX-ExtraBold.ttf') format('truetype');
+    font-weight: 800;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'IRANSansX';
+    src: url('../fonts/IRANSansX-Black.ttf') format('truetype');
+    font-weight: 900;
+    font-style: normal;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+.logo {
+ width: 50px;
+}
+
+:root {
+    --sarraf-yellow: #FCD535;
+    --sarraf-dark: #1A1F2E;
+    --sarraf-darker: #0F1419;
+    --sarraf-blue: #3B82F6;
+    --sarraf-blue-dark: #1E40AF;
+    --white: #FFFFFF;
+}
+
+body {
+    font-family: 'IRANSansX', 'Vazirmatn', sans-serif;
+    background: linear-gradient(135deg, var(--sarraf-darker) 0%, var(--sarraf-dark) 50%, var(--sarraf-darker) 100%);
+    color: var(--white);
+    min-height: 100vh;
+    direction: rtl;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.container {
+    width: 100%;
+    max-width: 600px;
+    padding: 2rem;
+    text-align: center;
+}
+
+.header {
+    margin-bottom: 3rem;
+}
+
+.brand {
+    font-size: 4rem;
+    font-weight: 900;
+    color: var(--sarraf-yellow);
+    text-shadow: 0 0 30px rgba(252, 213, 53, 0.5);
+    font-family: 'IRANSansX', sans-serif;
+}
+
+.tagline {
+    font-size: 1.1rem;
+    font-weight: 300;
+    color: rgba(255, 255, 255, 0.7);
+    margin-bottom: 1rem;
+}
+
+.page-title {
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: var(--white);
+}
+
+.wheel-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.wheel-container {
+    position: relative;
+    margin-bottom: 2rem;
+}
+
+#wheel {
+    display: block;
+    max-width: 400px;
+    height: auto;
+}
+
+.wheel-pointer {
+    position: absolute;
+    top: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 100;
+    filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.3));
+    animation: pointerPulse 2s ease-in-out infinite;
+}
+
+@keyframes pointerPulse {
+    0%, 100% {
+        transform: translateX(-50%) scale(1) translateY(0);
+    }
+    50% {
+        transform: translateX(-50%) scale(1.1) translateY(2px);
+    }
+}
+
+.spin-button {
+    background: linear-gradient(135deg, #FFCB00 0%, #FFCB00 100%);
+    color: #21323b;
+    font-size: 1.5rem;
+    font-weight: 700;
+    padding: 0.5rem 3rem;
+    border: none;
+    border-radius: 30px;
+    cursor: pointer;
+    transition: all 0.3s;
+    box-shadow: 0 8px 20px rgba(255, 107, 107, 0.4);
+    font-family: 'IRANSansX', sans-serif;
+}
+
+.spin-button:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 15px 40px rgba(59, 130, 246, 0.5);
+}
+
+.spin-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Modal */
+.modal {
+    display: none;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    z-index: 10000 !important;
+}
+
+.modal-backdrop {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    background: rgba(0, 0, 0, 0.8) !important;
+    backdrop-filter: blur(10px);
+    z-index: 10001 !important;
+}
+
+.modal-container {
+    position: fixed !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    background: linear-gradient(135deg, var(--sarraf-dark) 0%, #252B3B 100%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    width: 90%;
+    max-width: 450px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+    z-index: 10002 !important;
+}
+
+.modal-header {
+    padding: 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+}
+
+.modal-header h3 {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--white);
+    text-align: center !important;
+    margin: 0;
+    padding: 0;
+    font-family: 'IRANSansX', sans-serif;
+}
+
+.modal-close {
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    color: var(--white);
+    font-size: 1.5rem;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: absolute;
+    top: 1.5rem;
+    left: 1.5rem;
+    font-family: 'IRANSansX', sans-serif;
+}
+
+.modal-close:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.modal-body {
+    padding: 2rem;
+}
+
+/* بخش نمایش و ویرایش شماره - استایل جدید و زیباتر */
+.phone-edit-section {
+    width: 100%;
+    line-height: 30px;
+    padding: 1rem;
+}
+
+.phone-edit-section .form-label {
+    text-align: center !important;
+    display: block;
+    width: 100%;
+    margin-bottom: 1rem;
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.7);
+    letter-spacing: 0.5px;
+    font-family: 'IRANSansX', sans-serif;
+}
+
+.phone-display-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    width: 100%;
+}
+
+.phone-display {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--sarraf-yellow);
+    direction: ltr;
+    font-family: 'IRANSansX', monospace;
+    letter-spacing: 2px;
+    text-align: center;
+    text-shadow: 0 0 15px rgba(252, 213, 53, 0.4);
+    padding: 0.5rem 1rem;
+    background: rgba(252, 213, 53, 0.05);
+    border-radius: 10px;
+    min-width: 180px;
+}
+
+.btn-edit {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(59, 130, 246, 0.05));
+    border: 2px solid rgba(59, 130, 246, 0.4);
+    color: #60A5FA;
+    padding: 0.75rem 1.5rem;
+    border-radius: 12px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 600;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    position: relative;
+    overflow: hidden;
+    font-family: 'IRANSansX', sans-serif;
+}
+
+.btn-edit::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.2), transparent);
+    transition: left 0.5s ease;
+}
+
+.btn-edit:hover::before {
+    left: 100%;
+}
+
+.btn-edit:hover {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.25), rgba(59, 130, 246, 0.1));
+    border-color: var(--sarraf-blue);
+    color: var(--sarraf-blue);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(59, 130, 246, 0.3);
+}
+
+.btn-edit:active {
+    transform: translateY(0);
+    transition: transform 0.1s;
+}
+
+.btn-edit svg, .btn-edit .edit-icon {
+    width: 18px;
+    height: 18px;
+    transition: transform 0.3s;
+}
+
+.btn-edit:hover svg, .btn-edit:hover .edit-icon {
+    transform: rotate(15deg);
+}
+
+/* Prize Display Elements */
+.prize-image-container {
+    margin-bottom: 1.5rem;
+    text-align: center;
+}
+
+.prize-image {
+    max-width: 200px;
+    max-height: 200px;
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.prize-code-container {
+    margin: 1.5rem 0;
+    padding: 1rem;
+    background: rgba(252, 213, 53, 0.1);
+    border: 2px solid rgba(252, 213, 53, 0.3);
+    border-radius: 15px;
+}
+
+.code-label {
+    display: block;
+    font-size: 0.9rem;
+    color: var(--sarraf-yellow);
+    margin-bottom: 0.5rem;
+    text-align: center;
+    font-weight: 500;
+    font-family: 'IRANSansX', sans-serif;
+}
+
+.code-box {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    margin-top: 0.5rem;
+}
+
+.prize-code {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--white);
+    letter-spacing: 2px;
+    font-family: 'IRANSansX', monospace;
+}
+
+.copy-btn {
+    background: var(--sarraf-blue);
+    color: var(--white);
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 600;
+    transition: all 0.2s;
+    font-family: 'IRANSansX', sans-serif;
+}
+
+.copy-btn:hover {
+    background: var(--sarraf-blue-dark);
+    transform: translateY(-2px);
+}
+
+.copy-message {
+    display: block;
+    margin-top: 0.5rem;
+    color: #10B981;
+    font-size: 0.9rem;
+    font-weight: 500;
+    text-align: center;
+    font-family: 'IRANSansX', sans-serif;
+}
+
+.prize-action-btn {
+    width: 100%;
+    padding: 1rem;
+    font-size: 1.2rem;
+    font-weight: 700;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s;
+    background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+    color: var(--white);
+    margin-top: 1rem;
+    font-family: 'IRANSansX', sans-serif;
+}
+
+.prize-action-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(16, 185, 129, 0.3);
+}
+
+.form-step {
+    display: flex;
+    flex-direction: column;
+}
+
+.form-label {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--sarraf-yellow);
+    margin-bottom: 0.75rem;
+    text-align: center !important;
+    display: block;
+    width: 100%;
+    font-family: 'IRANSansX', sans-serif;
+}
+
+.form-input {
+    width: 100%;
+    padding: 1.2rem;
+    font-size: 1.2rem;
+    background: rgba(252, 213, 53, 0.05);
+    border: 2px solid rgba(252, 213, 53, 0.2);
+    border-radius: 16px;
+    color: var(--white);
+    text-align: center;
+    direction: ltr;
+    margin-bottom: 1rem;
+    font-family: 'IRANSansX', sans-serif;
+    font-weight: 500;
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: var(--sarraf-yellow);
+}
+
+.form-input::placeholder {
+    font-family: 'IRANSansX', sans-serif;
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.4);
+}
+
+.btn-primary, .btn-secondary, .btn-success {
+    width: 100%;
+    padding: 0.875rem;
+    font-size: 1.1rem;
+    font-weight: 700;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-bottom: 0.75rem;
+    font-family: 'IRANSansX', sans-serif;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, var(--sarraf-blue) 0%, var(--sarraf-blue-dark) 100%);
+    color: var(--white);
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(59, 130, 246, 0.3);
+}
+
+.btn-secondary {
+    background: transparent;
+    color: var(--sarraf-blue);
+    border: 2px solid var(--sarraf-blue);
+}
+
+.btn-secondary:hover {
+    background: rgba(59, 130, 246, 0.1);
+    transform: translateY(-2px);
+}
+
+.btn-success {
+    background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+    color: var(--white);
+}
+
+.btn-success:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(16, 185, 129, 0.3);
+}
+
+/* دکمه ارسال مجدد غیرفعال */
+.btn-secondary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.5);
+    border-color: rgba(255, 255, 255, 0.2);
+    position: relative;
+    overflow: hidden;
+    font-family: 'IRANSansX', monospace;
+    font-weight: 600;
+}
+
+.btn-secondary:disabled:hover {
+    transform: none;
+}
+
+.error-message {
+    color: #EF4444;
+    font-size: 0.9rem;
+    font-weight: 500;
+    margin-top: 0.5rem;
+    display: none;
+    text-align: center !important;
+    font-family: 'IRANSansX', sans-serif;
+}
+
+/* Win Modal */
+.celebration {
+    position: relative;
+}
+
+#winTitle {
+    font-size: 1.75rem;
+    font-weight: 800;
+    color: var(--sarraf-yellow);
+    margin-bottom: 0.5rem;
+    text-align: center !important;
+    font-family: 'IRANSansX', sans-serif;
+}
+
+.win-message, #winMessage {
+    font-size: 1.2rem;
+    color: rgba(255, 255, 255, 0.9);
+    margin-bottom: 1.5rem;
+    line-height: 1.8;
+    text-align: center !important;
+    font-family: 'IRANSansX', sans-serif;
+    font-weight: 400;
+}
+
+/* Loading */
+.loading-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.9);
+    z-index: 20000;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+}
+
+.loading-spinner {
+    width: 60px;
+    height: 60px;
+    border: 4px solid rgba(255, 255, 255, 0.1);
+    border-top-color: var(--sarraf-blue);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 1rem;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.loading-text {
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 1.1rem;
+    text-align: center !important;
+    font-family: 'IRANSansX', sans-serif;
+    font-weight: 400;
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* Canvas text font */
+canvas {
+    font-family: 'IRANSansX', sans-serif !important;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .container {
+        padding: 1rem;
+    }
+
+    .brand {
+        font-size: 3rem;
+    }
+
+    #wheel {
+        width: 350px;
+        height: 350px;
+    }
+
+    .modal-container {
+        width: 95%;
+        max-width: 400px;
+    }
+
+    .prize-image {
+        max-width: 150px;
+        max-height: 150px;
+    }
+
+    .prize-code {
+        font-size: 1.2rem;
+    }
+
+    /* موبایل - نمایش شماره و دکمه */
+    .phone-edit-section {
+        padding: 1rem;
+    }
+
+    .phone-display-row {
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .phone-display {
+        font-size: 1.3rem;
+        width: 100%;
+        padding: 0.75rem;
+    }
+
+    .btn-edit {
+        width: 100%;
+        padding: 0.75rem 1.5rem;
+        font-size: 1rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .phone-display {
+        font-size: 1.2rem;
+        letter-spacing: 1.5px;
+    }
+
+    .btn-edit {
+        font-size: 0.95rem;
+    }
+
+    .brand {
+        font-size: 2.5rem;
+    }
+
+    .page-title {
+        font-size: 1.5rem;
+    }
+}

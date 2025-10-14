@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>گردونه شانس - صراف</title>
+    <!-- استفاده از فونت محلی IRANSansX -->
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="container">
+    <!-- Header -->
+    <header class="header">
+        <div style="display: flex; align-items: center;justify-content: center;margin-bottom: 0.5rem;">
+            <img class="logo" src="/images/logo.png">
+            <p class="brand">صراف</p>
+        </div>
+        <p class="tagline">تجربه سرمایه‌گذاری امن و آسان</p>
+        <h2 class="page-title">گردونه شانس طلایی</h2>
+    </header>
+
+    <!-- Wheel Section -->
+    <div class="wheel-section">
+        <div class="wheel-container">
+            <canvas id="wheel" width="400" height="400"></canvas>
+            <div class="wheel-pointer">
+                <svg width="50" height="40" viewBox="0 0 50 40" fill="none">
+                    <path d="M25 40L10 10H40L25 40Z" fill="#FF6B6B"/>
+                    <path d="M25 40L15 15H35L25 40Z" fill="#E85D2F"/>
+                </svg>
+            </div>
+        </div>
+
+        <button id="spinBtn" class="spin-button">
+            <span>چرخش</span>
+        </button>
+    </div>
+</div>
+
+<!-- Login Modal -->
+<div id="loginModal" class="modal">
+    <div class="modal-backdrop"></div>
+    <div class="modal-container">
+        <div class="modal-header">
+            <h3>ورود به کمپین</h3>
+            <button class="modal-close" id="closeLogin">×</button>
+        </div>
+
+        <div class="modal-body">
+            <!-- Phone Step -->
+            <div id="phoneStep" class="form-step">
+                <label class="form-label">شماره موبایل</label>
+                <input type="tel" id="phoneInput" class="form-input" placeholder="۰۹۱۲۳۴۵۶۷۸۹" maxlength="11"
+                       inputmode="tel">
+                <button id="sendCodeBtn" class="btn-primary">ارسال کد تایید</button>
+                <div id="phoneError" class="error-message"></div>
+            </div>
+
+            <!-- Code Step -->
+            <div id="codeStep" class="form-step hidden">
+                <!-- بخش نمایش شماره با استایل جدید -->
+                <div class="phone-edit-section">
+                    <p class="form-label">کد تایید به شماره <span id="phoneDisplay"></span> ارسال شد</p>
+                </div>
+
+                <label class="form-label">کد تایید</label>
+                <input type="text" id="codeInput" class="form-input" placeholder="۱۲۳۴۵۶" maxlength="6" pattern="[۰-۹]*"
+                       inputmode="numeric" autocomplete="one-time-code">
+                <button id="verifyCodeBtn" class="btn-primary">تایید و ورود</button>
+                <button id="resendCodeBtn" class="btn-secondary">ارسال مجدد</button>
+
+                <div id="codeError" class="error-message"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Enhanced Win Modal with all prize details -->
+<div id="winModal" class="modal">
+    <div class="modal-backdrop"></div>
+    <div class="modal-container celebration">
+        <div class="modal-header">
+            <h3 id="winTitle">🎉 تبریک!</h3>
+            <button class="modal-close" id="closeWin">×</button>
+        </div>
+
+        <div class="modal-body">
+            <!-- Prize Image -->
+            <div id="prizeImageContainer" class="prize-image-container">
+                <img id="prizeImage" src="" alt="جایزه" class="prize-image">
+            </div>
+
+            <!-- Prize Text -->
+            <p id="winMessage" class="win-message"></p>
+
+            <!-- Prize Code (copyable) -->
+            <div id="prizeCodeContainer" class="prize-code-container hidden">
+                <label class="code-label">کد جایزه شما:</label>
+                <div class="code-box">
+                    <span id="prizeCode" class="prize-code"></span>
+                    <button id="copyCodeBtn" class="copy-btn" onclick="copyPrizeCode()">📋 کپی</button>
+                </div>
+                <span id="copyMessage" class="copy-message hidden">کپی شد!</span>
+            </div>
+
+            <!-- Action Button (links to prize URL) -->
+            <button id="prizeActionBtn" class="btn-success prize-action-btn">متوجه شدم</button>
+        </div>
+    </div>
+</div>
+
+<!-- Loading -->
+<div id="loadingOverlay" class="loading-overlay">
+    <div class="loading-spinner"></div>
+    <p class="loading-text">لطفا صبر کنید...</p>
+</div>
+
+<script>
+    // Function to copy prize code
+    function copyPrizeCode() {
+        const codeElement = document.getElementById('prizeCode');
+        const copyMessage = document.getElementById('copyMessage');
+
+        // Create temporary textarea to copy text
+        const tempTextarea = document.createElement('textarea');
+        tempTextarea.value = codeElement.textContent;
+        document.body.appendChild(tempTextarea);
+        tempTextarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(tempTextarea);
+
+        // Show copy confirmation
+        copyMessage.classList.remove('hidden');
+        setTimeout(() => {
+            copyMessage.classList.add('hidden');
+        }, 2000);
+    }
+</script>
+
+<script src="js/app.js"></script>
+</body>
+</html>
