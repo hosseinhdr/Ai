@@ -8,7 +8,40 @@ class WheelController {
 
     async spin(req, res) {
         try {
-            if (!req.session.isAuthenticated || !req.session.userId) {
+            if (!req.session.isAuthenticated) {
+                return res.status(401).json({
+                    success: false,
+                    message: 'لطفا ابتدا وارد شوید'
+                });
+            }
+
+            // چک کردن کاربر تست
+            if (req.session.isTestUser) {
+                console.log(`🎮 Test user spinning: ${req.session.phone}`);
+
+                // Select a random prize from database
+                const selectedPrize = await this.prizeService.selectPrize();
+
+                if (!selectedPrize) {
+                    throw new Error('No prize selected');
+                }
+
+                // برای کاربران تست، فقط جایزه رو برمی‌گردونیم بدون ذخیره
+                const prizeIndex = selectedPrize.displayOrder - 1;
+
+                console.log(`🎁 Test user won: ${selectedPrize.name}`);
+
+                return res.json({
+                    success: true,
+                    prizeIndex: prizeIndex,
+                    prize: selectedPrize.toWinnerFormat(),
+                    message: selectedPrize.isEmpty ? 'متاسفانه این بار برنده نشدید' : `تبریک! شما برنده ${selectedPrize.name} شدید`,
+                    testMode: true
+                });
+            }
+
+            // برای کاربران عادی، روند عادی
+            if (!req.session.userId) {
                 return res.status(401).json({
                     success: false,
                     message: 'لطفا ابتدا وارد شوید'
@@ -65,7 +98,27 @@ class WheelController {
 
     async getUserStatus(req, res) {
         try {
-            if (!req.session.isAuthenticated || !req.session.userId) {
+            if (!req.session.isAuthenticated) {
+                return res.json({
+                    success: true,
+                    hasPlayed: false,
+                    isAuthenticated: false
+                });
+            }
+
+            // چک کردن کاربر تست
+            if (req.session.isTestUser) {
+                return res.json({
+                    success: true,
+                    hasPlayed: false, // کاربران تست همیشه می‌توانند بازی کنند
+                    prize: null,
+                    isAuthenticated: true,
+                    isTestUser: true
+                });
+            }
+
+            // برای کاربران عادی
+            if (!req.session.userId) {
                 return res.json({
                     success: true,
                     hasPlayed: false,

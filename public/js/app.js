@@ -19,10 +19,8 @@ class LuckyWheel {
         this.resendTimer = null;
         this.resendCountdown = 0;
 
-        // فقط UTM های واقعی رو بگیر
         this.utmParams = this.getUTMParameters();
 
-        // فقط اگر واقعا UTM داشتیم لاگ کن
         if (this.utmParams && Object.keys(this.utmParams).length > 0) {
             console.log('📊 UTM Parameters detected:', this.utmParams);
         }
