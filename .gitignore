@@ -1,0 +1,7 @@
+.DS_Store
+.idea
+.env
+database.sqlite
+wheel.iml
+package-lock.json
+node_modules
