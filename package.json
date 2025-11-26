@@ -1,0 +1,35 @@
+{
+  "name": "tg-observer",
+  "version": "2.0.0",
+  "description": "Telegram Advertisement Observer - Multi Service",
+  "scripts": {
+    "start": "pm2 start ecosystem.config.js",
+    "stop": "pm2 stop all",
+    "restart": "pm2 restart all",
+    "status": "pm2 status",
+    "logs": "pm2 logs",
+    "monitor": "pm2 monit",
+    "observer:start": "pm2 start ecosystem.config.js --only tg-observer",
+    "observer:stop": "pm2 stop tg-observer",
+    "observer:restart": "pm2 restart tg-observer",
+    "observer:logs": "pm2 logs tg-observer",
+    "viewupdater:start": "pm2 start ecosystem.config.js --only tg-viewupdater",
+    "viewupdater:stop": "pm2 stop tg-viewupdater",
+    "viewupdater:restart": "pm2 restart tg-viewupdater",
+    "viewupdater:logs": "pm2 logs tg-viewupdater",
+    "dev:observer": "node start-observer.js",
+    "dev:viewupdater": "node start-viewupdater.js",
+    "setup": "node scripts/setup.js",
+    "manage": "./scripts/manage-services.sh"
+  },
+  "dependencies": {
+    "dotenv": "^16.3.1",
+    "input": "^1.0.1",
+    "moment-timezone": "^0.6.0",
+    "mysql2": "^3.6.0",
+    "telegram": "^2.19.8"
+  },
+  "devDependencies": {
+    "pm2": "^5.3.0"
+  }
+}

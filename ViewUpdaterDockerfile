@@ -1,0 +1,19 @@
+FROM node:18
+
+WORKDIR /app
+
+COPY . .
+RUN npm install --production
+
+COPY .env.server .env
+
+RUN mkdir -p logs sessions
+
+RUN echo "=== Directory Structure ===" && \
+    ls -la && \
+    echo "=== Services ===" && \
+    ls -la Services/ || ls -la services/ && \
+    echo "=== src ===" && \
+    ls -la src/Core/ || true
+
+CMD ["node", "Services/viewUpdater.js"]
