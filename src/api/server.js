@@ -420,8 +420,6 @@ export class APIServer {
                         forceRefresh = 'false'
                     } = req.query;
 
-                    logger.info(`Channel info request for: ${channel}`);
-
                     if (!channel) {
                         return res.status(400).json({
                             success: false,
@@ -429,12 +427,90 @@ export class APIServer {
                         });
                     }
 
+                    // Normalize channel URL - restore + that may have been decoded as space
+                    let normalizedChannel = channel;
+                    if (channel.includes('t.me/')) {
+                        // Fix: "t.me/ xxx" → "t.me/+xxx" (space after t.me/ means it was a +)
+                        normalizedChannel = channel.replace(/t\.me\/\s+/g, 't.me/+');
+                        // Also handle %2B
+                        normalizedChannel = normalizedChannel.replace(/%2B/gi, '+');
+                    }
+
+                    logger.info(`Channel info request for: ${normalizedChannel}`);
+
+                    // Check if this is a private invite link
+                    const isPrivateInvite = normalizedChannel.includes('+') ||
+                                           normalizedChannel.includes('joinchat');
+
+                    // For private invite links, must join first to get info
+                    // Default behavior: join → get info → leave (unless already joined)
+                    if (isPrivateInvite) {
+                        logger.info(`Private invite link detected: ${normalizedChannel}`);
+
+                        try {
+                            // Join the channel (will use session with lowest count)
+                            const joinResult = await this.telegramManager.joinChannel(normalizedChannel);
+
+                            if (joinResult.success) {
+                                // Return join result as channel info
+                                const result = {
+                                    success: true,
+                                    data: {
+                                        success: true,
+                                        id: joinResult.channelId,
+                                        title: joinResult.channelTitle,
+                                        username: joinResult.channelUsername || null,
+                                        participantsCount: joinResult.membersCount || 0,
+                                        isPrivate: true,
+                                        joinedVia: 'invite_link',
+                                        alreadyJoined: joinResult.alreadyJoined || false,
+                                        sessionUsed: joinResult.sessionUsed
+                                    }
+                                };
+
+                                // Default: leave after getting info (unless already joined or leaveAfter=false)
+                                const shouldLeave = leaveAfter !== 'false' && !joinResult.alreadyJoined;
+                                if (shouldLeave) {
+                                    try {
+                                        await this.telegramManager.leaveChannel(joinResult.channelId, joinResult.sessionUsed);
+                                        result.data.leftAfterInfo = true;
+                                        logger.info(`Left channel after getting info: ${joinResult.channelTitle}`);
+                                    } catch (leaveErr) {
+                                        logger.warn(`Failed to leave after info: ${leaveErr.message}`);
+                                    }
+                                }
+
+                                return res.json(result);
+                            }
+                        } catch (joinError) {
+                            logger.error(`Failed to join private channel: ${joinError.message}`);
+
+                            // Check if it's a FLOOD_WAIT error
+                            if (joinError.message.includes('wait of') || joinError.message.includes('FLOOD')) {
+                                const waitMatch = joinError.message.match(/(\d+)\s*seconds/);
+                                const waitSeconds = waitMatch ? parseInt(waitMatch[1]) : 60;
+                                return res.status(429).json({
+                                    success: false,
+                                    error: `Rate limited by Telegram. Wait ${waitSeconds} seconds.`,
+                                    waitSeconds: waitSeconds,
+                                    retryAfter: new Date(Date.now() + waitSeconds * 1000).toISOString()
+                                });
+                            }
+
+                            return res.status(400).json({
+                                success: false,
+                                error: `Cannot get private channel info: ${joinError.message}`,
+                                hint: 'The invite link may be invalid or expired'
+                            });
+                        }
+                    }
+
                     // Check server-side cache first (LRU cache handles TTL automatically)
-                    const cacheKey = `${channel}_${joinIfNeeded}_${leaveAfter}`;
+                    const cacheKey = `${normalizedChannel}_${joinIfNeeded}_${leaveAfter}`;
                     if (forceRefresh !== 'true') {
                         const cached = this.channelInfoCache.get(cacheKey);
                         if (cached !== null) {
-                            logger.info(`Returning cached result for ${channel}`);
+                            logger.info(`Returning cached result for ${normalizedChannel}`);
 
                             res.set({
                                 'Cache-Control': 'private, max-age=300',
@@ -462,7 +538,7 @@ export class APIServer {
 
                     // Get channel info
                     const result = await Promise.race([
-                        this.telegramManager.getChannelInfoWithOptions(channel, options),
+                        this.telegramManager.getChannelInfoWithOptions(normalizedChannel, options),
                         timeoutPromise
                     ]);
 

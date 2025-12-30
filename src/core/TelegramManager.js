@@ -112,6 +112,20 @@ class TelegramManager {
     }
 
     async _performJoin(channelIdentifier) {
+        // Check if channel already exists in any session
+        const existingSession = await this.findSessionWithChannelByIdentifier(channelIdentifier);
+        if (existingSession) {
+            logger.info(`Channel ${channelIdentifier} already exists in session ${existingSession.session.name}`);
+            return {
+                success: true,
+                alreadyJoined: true,
+                channelId: existingSession.channelId,
+                channelTitle: existingSession.channelTitle,
+                sessionUsed: existingSession.session.name,
+                message: `Channel already joined in session ${existingSession.session.name}`
+            };
+        }
+
         const session = await this.sessionPool.getAvailableSession();
 
         if (!session) {
@@ -498,6 +512,67 @@ class TelegramManager {
                 logger.debug(`Error checking channels for ${session.name}:`, error.message);
             }
         }
+        return null;
+    }
+
+    /**
+     * Find session that has the channel by identifier (username, link, or ID)
+     * Returns { session, channelId, channelTitle } or null
+     */
+    async findSessionWithChannelByIdentifier(channelIdentifier) {
+        // Handle invite links - can't check membership for private channels
+        if (channelIdentifier.includes('joinchat') || channelIdentifier.includes('+')) {
+            return null;
+        }
+
+        // First check database (fastest)
+        if (this.database?.isConnected) {
+            try {
+                const dbResult = await this.database.findSessionByChannel(channelIdentifier);
+                if (dbResult) {
+                    const session = this.getSessionByName(dbResult.sessionName);
+                    if (session && session.isConnected && session.healthStatus !== 'dead') {
+                        return {
+                            session,
+                            channelId: dbResult.channelId,
+                            channelTitle: dbResult.channelTitle
+                        };
+                    }
+                }
+            } catch (error) {
+                logger.debug('Database check failed:', error.message);
+            }
+        }
+
+        // Fallback: Check via Telegram API using dialogs cache
+        for (const session of this.sessions) {
+            if (!session.isConnected || session.healthStatus === 'dead') continue;
+
+            try {
+                if (session.dialogsCache && session.dialogsCache.length > 0) {
+                    // Extract identifier to compare
+                    let compareId = channelIdentifier.replace('@', '').replace('https://t.me/', '').split('?')[0];
+
+                    const found = session.dialogsCache.find(d =>
+                        d.id === compareId ||
+                        d.id === `-100${compareId}` ||
+                        d.id?.replace('-100', '') === compareId ||
+                        d.title?.toLowerCase() === compareId.toLowerCase()
+                    );
+
+                    if (found) {
+                        return {
+                            session,
+                            channelId: found.id,
+                            channelTitle: found.title
+                        };
+                    }
+                }
+            } catch (error) {
+                logger.debug(`Error checking session ${session.name}: ${error.message}`);
+            }
+        }
+
         return null;
     }
 

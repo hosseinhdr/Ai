@@ -326,12 +326,53 @@ export class TelegramSession {
 
             if (inviteLink.includes('joinchat') || inviteLink.includes('+')) {
                 const hash = inviteLink.split('+').pop() || inviteLink.split('joinchat/').pop();
-                result = await this.client.invoke(
-                    new Api.messages.ImportChatInvite({
-                        hash: hash.split('?')[0].split('/')[0].trim()
-                    })
-                );
-                entity = result.chats?.[0];
+                const cleanHash = hash.split('?')[0].split('/')[0].trim();
+
+                try {
+                    result = await this.client.invoke(
+                        new Api.messages.ImportChatInvite({ hash: cleanHash })
+                    );
+                    entity = result.chats?.[0];
+                } catch (joinErr) {
+                    // If already a participant, get channel info instead
+                    if (joinErr.message.includes('USER_ALREADY_PARTICIPANT')) {
+                        logger.info(`${this.name} already member of channel, getting info...`);
+
+                        // Use CheckChatInvite to get channel info
+                        const checkResult = await this.client.invoke(
+                            new Api.messages.CheckChatInvite({ hash: cleanHash })
+                        );
+
+                        // Extract chat from result
+                        entity = checkResult.chat || checkResult;
+
+                        // Get full info for members count
+                        let membersCount = entity?.participantsCount || 0;
+                        try {
+                            if (entity && entity.id) {
+                                const fullChannel = await this.client.invoke(
+                                    new Api.channels.GetFullChannel({ channel: entity })
+                                );
+                                membersCount = fullChannel.fullChat?.participantsCount || 0;
+                            }
+                        } catch (err) {
+                            logger.debug(`Could not get full channel: ${err.message}`);
+                        }
+
+                        return {
+                            success: true,
+                            alreadyJoined: true,
+                            channelId: entity?.id?.toString(),
+                            channelTitle: entity?.title || 'Unknown',
+                            channelUsername: entity?.username || null,
+                            membersCount: membersCount,
+                            sessionUsed: this.name,
+                            sessionCapacity: `${this.currentChannelsCount}/${this.maxChannels}`,
+                            remainingSlots: this.maxChannels - this.currentChannelsCount
+                        };
+                    }
+                    throw joinErr;
+                }
             } else {
                 const username = inviteLink.replace('https://t.me/', '').replace('@', '').split('?')[0];
                 entity = await this.client.getEntity(username);

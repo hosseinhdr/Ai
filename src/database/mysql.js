@@ -451,6 +451,42 @@ class Database {
         }
     }
 
+    /**
+     * Find which session has a channel (by channel_id or username)
+     * Returns { sessionName, channelId, channelTitle } or null
+     */
+    async findSessionByChannel(channelIdentifier) {
+        try {
+            // Clean up identifier
+            const cleanId = channelIdentifier.toString().replace('@', '').replace('https://t.me/', '');
+
+            // Check by channel_id or username
+            const [rows] = await this.pool.execute(
+                `SELECT ts.name as session_name, c.channel_id, c.title
+                 FROM session_channels sc
+                 JOIN telegram_sessions ts ON sc.session_id = ts.id
+                 JOIN channels c ON sc.channel_id = c.id
+                 WHERE sc.is_member = TRUE
+                 AND (c.channel_id = ? OR c.username = ? OR c.channel_id = CONCAT('-100', ?))
+                 LIMIT 1`,
+                [cleanId, cleanId, cleanId]
+            );
+
+            if (rows.length > 0) {
+                return {
+                    sessionName: rows[0].session_name,
+                    channelId: rows[0].channel_id,
+                    channelTitle: rows[0].title
+                };
+            }
+
+            return null;
+        } catch (error) {
+            logger.debug('findSessionByChannel error:', error.message);
+            return null;
+        }
+    }
+
     // ═══════════════════════════════════════
     // Logging and Analytics
     // ═══════════════════════════════════════
