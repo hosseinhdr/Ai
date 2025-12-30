@@ -577,43 +577,79 @@ class TelegramManager {
     async getChannelInfoWithOptions(channelIdentifier, options = {}) {
         logger.info(`TelegramManager: Getting info for ${channelIdentifier}`);
 
-        // Find best session for this operation
-        const session = await this.findBestSessionForChannel(channelIdentifier) || this.getFirstConnectedSession();
+        // Check if this is a numeric ID lookup
+        const isNumericId = /^-?\d+$/.test(channelIdentifier);
 
-        if (!session) {
+        // Get all healthy sessions to try
+        const healthySessions = this.sessions.filter(s =>
+            s.isConnected && s.healthStatus !== 'dead'
+        );
+
+        if (healthySessions.length === 0) {
             logger.error('No connected sessions available');
             throw new Error('No connected sessions available');
         }
 
-        logger.info(`Using session: ${session.name}`);
+        // For numeric IDs, try all sessions (different sessions may be members of different channels)
+        // For usernames, just use the first healthy session
+        const sessionsToTry = isNumericId ? healthySessions : [healthySessions[0]];
 
-        try {
-            const info = await session.getChannelInfo(channelIdentifier, options);
+        let lastError = null;
 
-            logger.info(`Got channel info:`, info);
+        for (const session of sessionsToTry) {
+            logger.info(`Trying session: ${session.name}`);
 
-            this.rateMonitor.recordOperation('info', session.name, true);
+            try {
+                const info = await session.getChannelInfo(channelIdentifier, options);
 
-            // Save to database if we have the info
-            if (this.database?.isConnected && info.id) {
-                await this.database.updateChannelInfo({
-                    id: info.id,
-                    title: info.title,
-                    username: info.username,
-                    about: info.about,
-                    participantsCount: info.participantsCount,
-                    isPublic: info.isPublic,
-                    isPrivate: info.isPrivate
-                });
+                // Check if we got a successful result (not an error response)
+                if (info.success === false) {
+                    lastError = new Error(info.error || 'Unknown error');
+                    logger.debug(`Session ${session.name} returned error: ${info.error}`);
+                    continue; // Try next session
+                }
+
+                logger.info(`Got channel info from ${session.name}:`, info);
+
+                this.rateMonitor.recordOperation('info', session.name, true);
+
+                // Save to database if we have the info
+                if (this.database?.isConnected && info.id) {
+                    await this.database.updateChannelInfo({
+                        id: info.id,
+                        title: info.title,
+                        username: info.username,
+                        about: info.about,
+                        participantsCount: info.participantsCount,
+                        isPublic: info.isPublic,
+                        isPrivate: info.isPrivate
+                    });
+                }
+
+                return { success: true, data: info };
+
+            } catch (error) {
+                logger.debug(`Session ${session.name} failed: ${error.message}`);
+                this.rateMonitor.recordOperation('info', session.name, false, error.message);
+                lastError = error;
+
+                // If AUTH_KEY error, mark session as dead
+                if (error.message.includes('AUTH_KEY')) {
+                    session.healthStatus = 'dead';
+                    session.isConnected = false;
+                }
+
+                // Continue to next session
             }
-
-            return { success: true, data: info };
-        } catch (error) {
-            logger.error(`Failed to get channel info with options: ${error.message}`);
-            logger.error(`Stack trace:`, error.stack);
-            this.rateMonitor.recordOperation('info', session.name, false, error.message);
-            throw error;
         }
+
+        // All sessions failed
+        const errorMsg = isNumericId
+            ? `Cannot find channel with ID: ${channelIdentifier}. None of the sessions are members of this channel. Use @username instead.`
+            : lastError?.message || 'Failed to get channel info';
+
+        logger.error(`Failed to get channel info: ${errorMsg}`);
+        throw new Error(errorMsg);
     }
 }
 

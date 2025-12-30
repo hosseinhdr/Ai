@@ -345,10 +345,25 @@ export class TelegramSession {
 
             const chat = entity || result.chats?.[0] || result.chat;
 
+            // Get members count
+            let membersCount = chat?.participantsCount || 0;
+            try {
+                if (chat && (chat.broadcast || chat.megagroup)) {
+                    const fullChannel = await this.client.invoke(
+                        new Api.channels.GetFullChannel({ channel: chat })
+                    );
+                    membersCount = fullChannel.fullChat?.participantsCount || 0;
+                }
+            } catch (err) {
+                logger.debug(`Could not get members count: ${err.message}`);
+            }
+
             return {
                 success: true,
                 channelId: chat?.id?.toString(),
                 channelTitle: chat?.title || 'Unknown',
+                channelUsername: chat?.username || null,
+                membersCount: membersCount,
                 sessionUsed: this.name,
                 sessionCapacity: `${this.currentChannelsCount}/${this.maxChannels}`,
                 remainingSlots: this.maxChannels - this.currentChannelsCount
@@ -393,8 +408,47 @@ export class TelegramSession {
                 entity = await this.client.getEntity(username);
             } else if (channelInput.startsWith('@')) {
                 entity = await this.client.getEntity(channelInput);
-            } else if (/^\d+$/.test(channelInput)) {
-                entity = await this.client.getEntity(parseInt(channelInput));
+            } else if (/^-?\d+$/.test(channelInput)) {
+                // Handle numeric channel IDs
+                let channelId = channelInput.toString();
+
+                // Try different ID formats
+                const idsToTry = [];
+
+                if (channelId.startsWith('-100')) {
+                    // Already in correct format: -1001233226069
+                    idsToTry.push(BigInt(channelId));
+                } else if (channelId.startsWith('-')) {
+                    // Negative but not -100 format
+                    idsToTry.push(BigInt(channelId));
+                    idsToTry.push(BigInt('-100' + channelId.substring(1)));
+                } else {
+                    // Positive ID like 1233226069
+                    // Try with -100 prefix first (most common for channels)
+                    idsToTry.push(BigInt('-100' + channelId));
+                    idsToTry.push(BigInt(channelId));
+                    idsToTry.push(BigInt('-' + channelId));
+                }
+
+                let lastError = null;
+                for (const id of idsToTry) {
+                    try {
+                        entity = await this.client.getEntity(id);
+                        break;
+                    } catch (err) {
+                        lastError = err;
+                        logger.debug(`Failed to get entity with ID ${id}: ${err.message}`);
+                    }
+                }
+
+                if (!entity) {
+                    // Provide helpful error message
+                    const errorMsg = `Cannot find channel with ID: ${channelInput}. ` +
+                        `This session is not a member of this channel. ` +
+                        `To lookup by ID, the session must be a member. ` +
+                        `Use the channel's @username instead, or join the channel first.`;
+                    throw new Error(errorMsg);
+                }
             } else {
                 entity = await this.client.getEntity(channelInput);
             }
