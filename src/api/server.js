@@ -20,6 +20,117 @@ import fs from 'fs';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+/**
+ * LRU Cache for server-side response caching
+ */
+class LRUServerCache {
+    constructor(maxSize = 100, ttlMs = 300000) {
+        this.maxSize = maxSize;
+        this.ttlMs = ttlMs;
+        this.cache = new Map();
+        this.accessOrder = new Map();
+
+        // Automatic cleanup every 5 minutes
+        this.cleanupInterval = setInterval(() => {
+            this.cleanup();
+        }, 300000);
+    }
+
+    set(key, value) {
+        const now = Date.now();
+
+        // Evict LRU if cache is full
+        if (this.cache.size >= this.maxSize && !this.cache.has(key)) {
+            this.evictLRU();
+        }
+
+        this.cache.set(key, {
+            data: value,
+            timestamp: now
+        });
+        this.accessOrder.set(key, now);
+    }
+
+    get(key) {
+        if (!this.cache.has(key)) {
+            return null;
+        }
+
+        const item = this.cache.get(key);
+        const now = Date.now();
+
+        // Check expiration
+        if (now - item.timestamp > this.ttlMs) {
+            this.delete(key);
+            return null;
+        }
+
+        // Update access time
+        this.accessOrder.set(key, now);
+        return item;
+    }
+
+    has(key) {
+        const item = this.get(key);
+        return item !== null;
+    }
+
+    delete(key) {
+        this.cache.delete(key);
+        this.accessOrder.delete(key);
+    }
+
+    clear() {
+        this.cache.clear();
+        this.accessOrder.clear();
+    }
+
+    cleanup() {
+        const now = Date.now();
+        let removed = 0;
+
+        for (const [key, item] of this.cache.entries()) {
+            if (now - item.timestamp > this.ttlMs) {
+                this.delete(key);
+                removed++;
+            }
+        }
+
+        if (removed > 0) {
+            logger.debug(`Server cache cleanup: removed ${removed} expired entries, ${this.cache.size} remaining`);
+        }
+    }
+
+    evictLRU() {
+        let oldestKey = null;
+        let oldestTime = Infinity;
+
+        for (const [key, time] of this.accessOrder.entries()) {
+            if (time < oldestTime) {
+                oldestTime = time;
+                oldestKey = key;
+            }
+        }
+
+        if (oldestKey) {
+            this.delete(oldestKey);
+            logger.debug(`Server cache eviction: removed LRU entry`);
+        }
+    }
+
+    get size() {
+        return this.cache.size;
+    }
+
+    destroy() {
+        if (this.cleanupInterval) {
+            clearInterval(this.cleanupInterval);
+            this.cleanupInterval = null;
+        }
+        this.clear();
+    }
+}
+
 
 export class APIServer {
     constructor(telegramManager, database, monitoringService, operationQueue, config) {
@@ -37,9 +148,8 @@ export class APIServer {
         // Initialize Auto-Optimizer
         this.autoOptimizer = new AutoOptimizer(telegramManager, database);
 
-        // Response cache for channel info
-        this.channelInfoCache = new Map();
-        this.cacheTimeout = 300000; // 5 minutes
+        // Response cache for channel info with LRU implementation
+        this.channelInfoCache = new LRUServerCache(100, 300000); // Max 100 items, 5-min TTL
 
         this.setupMiddleware();
         this.setupRoutes();
@@ -319,11 +429,11 @@ export class APIServer {
                         });
                     }
 
-                    // Check server-side cache first
+                    // Check server-side cache first (LRU cache handles TTL automatically)
                     const cacheKey = `${channel}_${joinIfNeeded}_${leaveAfter}`;
-                    if (forceRefresh !== 'true' && this.channelInfoCache.has(cacheKey)) {
+                    if (forceRefresh !== 'true') {
                         const cached = this.channelInfoCache.get(cacheKey);
-                        if (Date.now() - cached.timestamp < this.cacheTimeout) {
+                        if (cached !== null) {
                             logger.info(`Returning cached result for ${channel}`);
 
                             res.set({
@@ -366,17 +476,11 @@ export class APIServer {
                         });
                     }
 
-                    // Cache the successful result
+                    // Cache the successful result (LRU cache handles size limits automatically)
                     this.channelInfoCache.set(cacheKey, {
                         data: result,
                         timestamp: Date.now()
                     });
-
-                    // Clean old cache entries
-                    if (this.channelInfoCache.size > 100) {
-                        const oldestKey = this.channelInfoCache.keys().next().value;
-                        this.channelInfoCache.delete(oldestKey);
-                    }
 
                     // Convert photo path to accessible URL if exists and requested
                     if (result.data?.profilePhotoPath && includePhoto === 'true') {
@@ -502,15 +606,16 @@ export class APIServer {
             connected: this.database?.isConnected || false
         };
 
-        // آپدیت تعداد کانال‌ها برای دقت
+        // استفاده از تعداد فعلی کانال‌ها (بدون آپدیت - خیلی سنگینه!)
         const sessions = this.telegramManager?.sessions || [];
         let totalChannels = 0;
         let totalCapacity = 0;
 
         for (const session of sessions) {
             if (session.isConnected) {
-                await session.updateChannelsCount();
-                totalChannels += session.currentChannelsCount;
+                // از currentChannelsCount استفاده کن بدون اینکه getDialogs رو صدا بزنیم
+                // updateChannelsCount() خیلی سنگینه و 2000 dialog رو load میکنه!
+                totalChannels += session.currentChannelsCount || 0;
                 totalCapacity += session.maxChannels;
             }
         }
@@ -570,6 +675,12 @@ export class APIServer {
     }
 
     async stop() {
+        // Cleanup cache
+        if (this.channelInfoCache) {
+            this.channelInfoCache.destroy();
+            logger.info('Server cache destroyed');
+        }
+
         if (this.server) {
             return new Promise((resolve) => {
                 this.server.close(() => {

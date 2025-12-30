@@ -69,6 +69,11 @@ export class SmartRateMonitor {
             now - op.timestamp < 60000
         );
 
+        // محدود کردن تعداد عملیات ذخیره شده (حداکثر 100 عملیات در دقیقه)
+        if (stats.operations.length > 100) {
+            stats.operations = stats.operations.slice(-100);
+        }
+
         // بررسی flood wait
         if (error && error.includes && error.includes('FLOOD_WAIT')) {
             stats.floodWaits++;
@@ -326,6 +331,7 @@ export class SmartRateMonitor {
     cleanup() {
         const now = Date.now();
         const maxAge = 3600000; // 1 ساعت
+        let removed = 0;
 
         // پاکسازی آمار عملیات
         for (const [key, stats] of this.operationStats) {
@@ -336,6 +342,7 @@ export class SmartRateMonitor {
             if (stats.operations.length === 0 &&
                 (!stats.lastFloodWait || now - stats.lastFloodWait > maxAge)) {
                 this.operationStats.delete(key);
+                removed++;
             }
         }
 
@@ -344,9 +351,45 @@ export class SmartRateMonitor {
             const filtered = history.filter(h => now - h.timestamp < maxAge);
             if (filtered.length === 0) {
                 this.floodWaitHistory.delete(session);
+                removed++;
             } else {
                 this.floodWaitHistory.set(session, filtered);
             }
+        }
+
+        // پاکسازی sessionHealth (THIS WAS MISSING!)
+        for (const [session, health] of this.sessionHealth) {
+            // حذف سشن‌هایی که بیش از 1 ساعت فعالیتی نداشته‌اند
+            if (now - health.lastUpdate > maxAge) {
+                this.sessionHealth.delete(session);
+                removed++;
+            }
+        }
+
+        if (removed > 0) {
+            logger.debug(`SmartRateMonitor cleanup: removed ${removed} old entries. Stats: ${this.operationStats.size} ops, ${this.sessionHealth.size} sessions, ${this.floodWaitHistory.size} flood waits`);
+        }
+
+        // Enforce maximum sizes to prevent unbounded growth
+        if (this.operationStats.size > 500) {
+            const toRemove = this.operationStats.size - 500;
+            const keys = Array.from(this.operationStats.keys()).slice(0, toRemove);
+            keys.forEach(key => this.operationStats.delete(key));
+            logger.warn(`SmartRateMonitor: Removed ${toRemove} oldest operation stats (exceeded 500 limit)`);
+        }
+
+        if (this.sessionHealth.size > 100) {
+            const toRemove = this.sessionHealth.size - 100;
+            const keys = Array.from(this.sessionHealth.keys()).slice(0, toRemove);
+            keys.forEach(key => this.sessionHealth.delete(key));
+            logger.warn(`SmartRateMonitor: Removed ${toRemove} oldest session health entries (exceeded 100 limit)`);
+        }
+
+        if (this.floodWaitHistory.size > 100) {
+            const toRemove = this.floodWaitHistory.size - 100;
+            const keys = Array.from(this.floodWaitHistory.keys()).slice(0, toRemove);
+            keys.forEach(key => this.floodWaitHistory.delete(key));
+            logger.warn(`SmartRateMonitor: Removed ${toRemove} oldest flood wait histories (exceeded 100 limit)`);
         }
     }
 

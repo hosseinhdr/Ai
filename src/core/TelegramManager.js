@@ -29,9 +29,26 @@ class TelegramManager {
             this.sessions.push(session);
         }
 
-        // Connect all sessions
-        const connectionPromises = this.sessions.map(session => session.connect());
-        const results = await Promise.allSettled(connectionPromises);
+        // Connect sessions with staggered delays to avoid rate limiting
+        logger.info(`Connecting ${this.sessions.length} sessions with staggered delays...`);
+        const results = [];
+
+        for (let i = 0; i < this.sessions.length; i++) {
+            const session = this.sessions[i];
+
+            // Add 2-second delay between connections (except first one)
+            if (i > 0) {
+                logger.debug(`Waiting 2s before connecting ${session.name}...`);
+                await new Promise(resolve => setTimeout(resolve, 2000));
+            }
+
+            try {
+                const connected = await session.connect();
+                results.push({ status: 'fulfilled', value: connected });
+            } catch (error) {
+                results.push({ status: 'rejected', reason: error });
+            }
+        }
 
         const connectedSessions = results.filter(r => r.status === 'fulfilled' && r.value === true);
 

@@ -3,13 +3,22 @@ import { StringSession } from 'telegram/sessions/index.js';
 import logger from '../utils/logger.js';
 
 class TelegramNotifier {
-    constructor(config) {
+    constructor(config, telegramManager = null) {
         this.config = config;
+        this.telegramManager = telegramManager;
         this.client = null;
+        this.sessionForNotifications = null;
         this.isConnected = false;
         this.adminUserId = config.telegram?.adminUserId || process.env.ADMIN_USER_ID;
         this.adminUsername = config.telegram?.adminUsername || process.env.ADMIN_USERNAME;
         this.enabled = !!(this.adminUserId || this.adminUsername);
+    }
+
+    /**
+     * Set the TelegramManager instance to reuse existing session
+     */
+    setTelegramManager(telegramManager) {
+        this.telegramManager = telegramManager;
     }
 
     async connect() {
@@ -19,7 +28,23 @@ class TelegramNotifier {
         }
 
         try {
-            // Use the first available session for notifications
+            // ✅ FIX: Reuse existing session from TelegramManager instead of creating duplicate
+            if (this.telegramManager && this.telegramManager.sessions.length > 0) {
+                // Find first connected session
+                this.sessionForNotifications = this.telegramManager.sessions.find(s => s.isConnected);
+
+                if (this.sessionForNotifications) {
+                    // Reuse the existing client - NO duplicate connection!
+                    this.client = this.sessionForNotifications.client;
+                    this.isConnected = true;
+                    logger.info('✅ Telegram Notifier using existing session (no duplicate connection)');
+                    return true;
+                }
+            }
+
+            // ⚠️ Fallback: Only if TelegramManager not available (shouldn't happen)
+            logger.warn('TelegramNotifier: TelegramManager not available, creating standalone connection');
+
             const sessions = this.config.telegram.sessions;
             if (!sessions || sessions.length === 0) {
                 logger.warn('No sessions available for notifications');
@@ -56,7 +81,7 @@ class TelegramNotifier {
             await this.client.connect();
             this.isConnected = true;
 
-            logger.info('✅ Telegram Notifier connected');
+            logger.info('✅ Telegram Notifier connected (standalone)');
             return true;
 
         } catch (error) {
@@ -67,10 +92,19 @@ class TelegramNotifier {
     }
 
     async disconnect() {
-        if (this.client) {
-            await this.client.disconnect();
+        // ✅ FIX: Don't disconnect if we're reusing a session from TelegramManager
+        if (this.sessionForNotifications) {
+            // Just clear reference, don't disconnect shared client
+            this.client = null;
+            this.sessionForNotifications = null;
             this.isConnected = false;
-            logger.info('Telegram Notifier disconnected');
+            logger.info('Telegram Notifier disconnected (reused session not closed)');
+        } else if (this.client) {
+            // Only disconnect if we created our own standalone connection
+            await this.client.disconnect();
+            this.client = null;
+            this.isConnected = false;
+            logger.info('Telegram Notifier disconnected (standalone connection closed)');
         }
     }
 

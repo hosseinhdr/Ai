@@ -53,7 +53,7 @@ class Application {
 
             // Step 4: Telegram Notifier
             logger.info('📢 Setting up Telegram Notifier...');
-            this.notifier = new TelegramNotifier(config);
+            this.notifier = new TelegramNotifier(config, this.telegramManager);
             await this.notifier.connect();
 
             // Step 5: Health Checker
