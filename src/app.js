@@ -230,13 +230,15 @@ class Application {
                 await this.apiServer.stop();
             }
 
-            if (this.telegramManager) {
-                await this.telegramManager.shutdown();
-            }
-
+            // Send shutdown notification BEFORE disconnecting Telegram sessions
+            // (notifier reuses telegramManager's session)
             if (this.notifier?.isConnected) {
                 await this.notifier.sendNotification('🛑 سیستم خاموش شد', 'warning');
                 await this.notifier.disconnect();
+            }
+
+            if (this.telegramManager) {
+                await this.telegramManager.shutdown();
             }
 
             if (database.isConnected) {

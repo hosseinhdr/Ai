@@ -27,6 +27,8 @@ class TelegramNotifier {
             return false;
         }
 
+        logger.info(`Telegram Notifier config: adminUserId=${this.adminUserId}, adminUsername=${this.adminUsername}`);
+
         try {
             // ✅ FIX: Reuse existing session from TelegramManager instead of creating duplicate
             if (this.telegramManager && this.telegramManager.sessions.length > 0) {
@@ -37,9 +39,13 @@ class TelegramNotifier {
                     // Reuse the existing client - NO duplicate connection!
                     this.client = this.sessionForNotifications.client;
                     this.isConnected = true;
-                    logger.info('✅ Telegram Notifier using existing session (no duplicate connection)');
+                    logger.info(`✅ Telegram Notifier using session: ${this.sessionForNotifications.name}`);
                     return true;
+                } else {
+                    logger.warn('No connected sessions found in TelegramManager');
                 }
+            } else {
+                logger.warn('TelegramManager has no sessions available');
             }
 
             // ⚠️ Fallback: Only if TelegramManager not available (shouldn't happen)
@@ -110,6 +116,16 @@ class TelegramNotifier {
 
     async sendNotification(message, type = 'info') {
         if (!this.enabled || !this.isConnected) {
+            logger.debug('Notifier not enabled or not connected');
+            return false;
+        }
+
+        // Check if client is still connected (session might have been closed)
+        // GramJS uses _connected or we can check via .connected property
+        const isClientConnected = this.client?._connected || this.client?.connected;
+        if (!isClientConnected) {
+            logger.warn('Telegram client is not connected, cannot send notification');
+            this.isConnected = false;
             return false;
         }
 
@@ -127,29 +143,65 @@ class TelegramNotifier {
             // Try to send by user ID first
             if (this.adminUserId) {
                 try {
-                    await this.client.sendMessage(this.adminUserId, {
+                    // Convert to BigInt for GramJS compatibility
+                    const userId = BigInt(this.adminUserId);
+                    logger.debug(`Sending notification to user ID: ${userId}`);
+
+                    // Try to get the entity first (this resolves access hash)
+                    let entity;
+                    try {
+                        entity = await this.client.getEntity(userId);
+                    } catch (entityError) {
+                        // If getEntity fails, try sending directly (works for some cases)
+                        logger.debug(`Could not get entity, trying direct send: ${entityError.message}`);
+                        entity = userId;
+                    }
+
+                    await this.client.sendMessage(entity, {
                         message: formattedMessage,
                         parseMode: 'markdown'
                     });
+                    logger.debug('Notification sent successfully via user ID');
                     return true;
                 } catch (error) {
-                    logger.debug('Failed to send by user ID, trying username...');
+                    logger.warn(`Failed to send by user ID (${this.adminUserId}): ${error.message}`);
                 }
             }
 
-            // Try by username
-            if (this.adminUsername) {
-                const username = this.adminUsername.startsWith('@')
-                    ? this.adminUsername
-                    : '@' + this.adminUsername;
+            // Try by username (only if it's actually a username, not a numeric ID)
+            if (this.adminUsername && !/^\d+$/.test(this.adminUsername)) {
+                try {
+                    const username = this.adminUsername.startsWith('@')
+                        ? this.adminUsername
+                        : '@' + this.adminUsername;
 
-                await this.client.sendMessage(username, {
+                    logger.debug(`Sending notification to username: ${username}`);
+                    await this.client.sendMessage(username, {
+                        message: formattedMessage,
+                        parseMode: 'markdown'
+                    });
+                    logger.debug('Notification sent successfully via username');
+                    return true;
+                } catch (error) {
+                    logger.warn(`Failed to send by username (${this.adminUsername}): ${error.message}`);
+                }
+            }
+
+            // Fallback: Send to "me" (Saved Messages) if admin send failed
+            // This helps debug if the issue is with admin resolution
+            try {
+                logger.warn('Falling back to Saved Messages (me)');
+                await this.client.sendMessage('me', {
                     message: formattedMessage,
                     parseMode: 'markdown'
                 });
+                logger.info('Notification sent to Saved Messages (admin user may need to message the bot first)');
                 return true;
+            } catch (meError) {
+                logger.error(`Failed to send to Saved Messages: ${meError.message}`);
             }
 
+            logger.warn('No valid admin user configured for notifications');
             return false;
 
         } catch (error) {
