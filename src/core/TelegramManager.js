@@ -17,6 +17,26 @@ class TelegramManager {
     async initialize() {
         logger.info('📱 Initializing Telegram Manager...');
 
+        // Check for recent shutdown to prevent AUTH_KEY_DUPLICATED
+        const lastShutdownFile = '/tmp/telegram-manager-shutdown.lock';
+        try {
+            const fs = await import('fs');
+            if (fs.existsSync(lastShutdownFile)) {
+                const lastShutdown = parseInt(fs.readFileSync(lastShutdownFile, 'utf8') || '0');
+                const timeSinceShutdown = Date.now() - lastShutdown;
+                const minWaitTime = 5000; // 5 seconds minimum between shutdown and startup
+
+                if (timeSinceShutdown < minWaitTime) {
+                    const waitTime = minWaitTime - timeSinceShutdown;
+                    logger.warn(`⏳ Waiting ${waitTime}ms before connecting to prevent AUTH_KEY_DUPLICATED...`);
+                    await new Promise(resolve => setTimeout(resolve, waitTime));
+                }
+                fs.unlinkSync(lastShutdownFile);
+            }
+        } catch (err) {
+            // Ignore file errors
+        }
+
         // Initialize sessions
         for (const sessionConfig of this.config.telegram.sessions) {
             const session = new TelegramSession(
@@ -221,12 +241,23 @@ class TelegramManager {
             logger.error(`Failed to get channel info: ${error.message}`);
             this.rateMonitor.recordOperation('info', session.name, false, error.message);
 
-            // If failed with one session, try another
+            // If failed with AUTH_KEY error, mark session as dead and try another
+            if (error.message.includes('AUTH_KEY')) {
+                session.healthStatus = 'dead';
+                session.isConnected = false;
+                logger.warn(`Session ${session.name} marked as dead due to AUTH_KEY error`);
+            }
+
+            // Try another healthy session
             if (this.sessions.length > 1) {
-                const otherSession = this.sessions.find(s => s.isConnected && s !== session);
+                const otherSession = this.sessions.find(s =>
+                    s.isConnected &&
+                    s !== session &&
+                    s.healthStatus !== 'dead'
+                );
                 if (otherSession) {
                     try {
-                        logger.info('Retrying with different session...');
+                        logger.info(`Retrying with session ${otherSession.name}...`);
                         const info = await otherSession.getChannelInfo(channelIdentifier);
                         return { success: true, data: info };
                     } catch (retryError) {
@@ -294,10 +325,10 @@ class TelegramManager {
         // First, try to find a session that's already member
         if (/^-?\d+$/.test(channelIdentifier)) {
             const memberSession = await this.findSessionWithChannel(channelIdentifier);
-            if (memberSession) return memberSession;
+            if (memberSession && memberSession.healthStatus !== 'dead') return memberSession;
         }
 
-        // Otherwise, return the healthiest connected session
+        // Otherwise, return the healthiest connected session (exclude dead sessions)
         const healthySessions = this.sessions
             .filter(s => s.isConnected && s.healthStatus === 'healthy')
             .sort((a, b) => a.currentChannelsCount - b.currentChannelsCount);
@@ -450,7 +481,8 @@ class TelegramManager {
     }
 
     getFirstConnectedSession() {
-        return this.sessions.find(s => s.isConnected);
+        // Skip sessions with AUTH_KEY issues (dead status)
+        return this.sessions.find(s => s.isConnected && s.healthStatus !== 'dead');
     }
 
     async findSessionWithChannel(channelId) {
@@ -504,15 +536,30 @@ class TelegramManager {
             this.sessionPool.stopAutoRotation();
         }
 
-        const disconnectPromises = this.sessions.map(async (session) => {
+        // Disconnect sessions sequentially with delays to prevent AUTH_KEY_DUPLICATED on restart
+        for (const session of this.sessions) {
             try {
+                logger.info(`Disconnecting ${session.name}...`);
                 await session.disconnect();
+                // Small delay between disconnections to ensure clean shutdown
+                await new Promise(resolve => setTimeout(resolve, 500));
             } catch (error) {
                 logger.debug(`Error disconnecting ${session.name}:`, error.message);
             }
-        });
+        }
 
-        await Promise.allSettled(disconnectPromises);
+        // Wait a bit after all disconnections to ensure Telegram servers register them
+        logger.info('Waiting for Telegram servers to register disconnections...');
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        // Write shutdown timestamp to prevent rapid restart AUTH_KEY issues
+        try {
+            const fs = await import('fs');
+            fs.writeFileSync('/tmp/telegram-manager-shutdown.lock', Date.now().toString());
+        } catch (err) {
+            // Ignore file errors
+        }
+
         this.isInitialized = false;
         logger.info('Telegram Manager shut down complete');
     }

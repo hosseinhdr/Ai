@@ -477,10 +477,8 @@ export class APIServer {
                     }
 
                     // Cache the successful result (LRU cache handles size limits automatically)
-                    this.channelInfoCache.set(cacheKey, {
-                        data: result,
-                        timestamp: Date.now()
-                    });
+                    // Note: LRUServerCache.set() already wraps with { data, timestamp }
+                    this.channelInfoCache.set(cacheKey, result);
 
                     // Convert photo path to accessible URL if exists and requested
                     if (result.data?.profilePhotoPath && includePhoto === 'true') {

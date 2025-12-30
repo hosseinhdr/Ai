@@ -362,6 +362,13 @@ export class TelegramSession {
                 this.floodWaitUntil = new Date(Date.now() + waitTime * 1000);
             }
 
+            // Detect AUTH_KEY errors and mark session as dead
+            if (error.message.includes('AUTH_KEY')) {
+                logger.error(`🔑 ${this.name} AUTH_KEY error during join - marking as dead`);
+                this.healthStatus = 'dead';
+                this.isConnected = false;
+            }
+
             throw error;
         }
     }
@@ -371,7 +378,7 @@ export class TelegramSession {
             const cacheKey = `channel_${channelInput}`;
 
             // Check cache first (LRU cache handles TTL automatically)
-            if (!options.skipCache) {
+            if (!options.skipCache && !options.forceRefresh) {
                 const cached = this.channelCache.get(cacheKey);
                 if (cached !== null) {
                     logger.debug(`Cache hit for channel ${channelInput}`);
@@ -392,12 +399,27 @@ export class TelegramSession {
                 entity = await this.client.getEntity(channelInput);
             }
 
+            // Get full channel info to retrieve participants count
+            let participantsCount = entity.participantsCount || 0;
+
+            try {
+                if (entity.broadcast || entity.megagroup) {
+                    const fullChannel = await this.client.invoke(
+                        new Api.channels.GetFullChannel({ channel: entity })
+                    );
+                    participantsCount = fullChannel.fullChat?.participantsCount || 0;
+                }
+            } catch (fullError) {
+                logger.debug(`Could not get full channel info: ${fullError.message}`);
+                // Keep the original participantsCount from entity
+            }
+
             const channelInfo = {
                 success: true,
                 id: entity.id?.toString(),
                 title: entity.title || 'Unknown',
                 username: entity.username || null,
-                participantsCount: entity.participantsCount || 0,
+                participantsCount: participantsCount,
                 verified: entity.verified || false,
                 broadcast: entity.broadcast || false,
                 megagroup: entity.megagroup || false,
@@ -411,6 +433,14 @@ export class TelegramSession {
 
         } catch (error) {
             logger.error(`Get info failed: ${error.message}`);
+
+            // Detect AUTH_KEY errors and mark session as dead
+            if (error.message.includes('AUTH_KEY')) {
+                logger.error(`🔑 ${this.name} AUTH_KEY error during operation - marking as dead`);
+                this.healthStatus = 'dead';
+                this.isConnected = false;
+            }
+
             return {
                 success: false,
                 error: error.message
@@ -440,6 +470,14 @@ export class TelegramSession {
 
         } catch (error) {
             logger.error(`Leave failed: ${error.message}`);
+
+            // Detect AUTH_KEY errors and mark session as dead
+            if (error.message.includes('AUTH_KEY')) {
+                logger.error(`🔑 ${this.name} AUTH_KEY error during leave - marking as dead`);
+                this.healthStatus = 'dead';
+                this.isConnected = false;
+            }
+
             throw error;
         }
     }
@@ -490,9 +528,28 @@ export class TelegramSession {
      */
     async disconnect() {
         try {
-            if (this.client && this.isConnected) {
-                await this.client.disconnect();
-                logger.info(`Disconnected session ${this.name}`);
+            if (this.client) {
+                // First try graceful disconnect
+                if (this.isConnected) {
+                    try {
+                        await this.client.disconnect();
+                        logger.info(`Disconnected session ${this.name}`);
+                    } catch (disconnectError) {
+                        logger.debug(`Disconnect error for ${this.name}: ${disconnectError.message}`);
+                    }
+                }
+
+                // Then destroy the client completely to release all resources
+                try {
+                    if (typeof this.client.destroy === 'function') {
+                        await this.client.destroy();
+                        logger.debug(`Destroyed client for ${this.name}`);
+                    }
+                } catch (destroyError) {
+                    logger.debug(`Destroy error for ${this.name}: ${destroyError.message}`);
+                }
+
+                this.client = null;
             }
         } catch (error) {
             logger.error(`Error disconnecting ${this.name}:`, error.message);
@@ -502,7 +559,7 @@ export class TelegramSession {
 
             // Destroy cache and stop cleanup interval
             this.channelCache.destroy();
-            logger.info(`Cache destroyed for session ${this.name}`);
+            logger.debug(`Cache destroyed for session ${this.name}`);
         }
     }
 
