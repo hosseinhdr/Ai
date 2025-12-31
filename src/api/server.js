@@ -462,6 +462,19 @@ export class APIServer {
                                     }
                                 };
 
+                                // Download photo before leaving (if requested)
+                                if (includePhoto === 'true') {
+                                    try {
+                                        const photoResult = await this.telegramManager.getChannelPhoto(joinResult.channelId);
+                                        if (photoResult.success && photoResult.photoPath) {
+                                            const photoFileName = path.basename(photoResult.photoPath);
+                                            result.data.profilePhotoUrl = `/photos/${photoFileName}`;
+                                        }
+                                    } catch (photoError) {
+                                        logger.warn(`Failed to get private channel photo: ${photoError.message}`);
+                                    }
+                                }
+
                                 // Always leave after getting info for private channels
                                 try {
                                     await this.telegramManager.leaveChannel(joinResult.channelId, joinResult.sessionUsed);
