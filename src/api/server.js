@@ -544,10 +544,18 @@ export class APIServer {
                     // Note: LRUServerCache.set() already wraps with { data, timestamp }
                     this.channelInfoCache.set(cacheKey, result);
 
-                    // Convert photo path to accessible URL if exists and requested
-                    if (result.data?.profilePhotoPath && includePhoto === 'true') {
-                        const photoFileName = path.basename(result.data.profilePhotoPath);
-                        result.data.profilePhotoUrl = `/photos/${photoFileName}`;
+                    // Download and include channel photo if requested
+                    if (includePhoto === 'true') {
+                        try {
+                            const photoResult = await this.telegramManager.getChannelPhoto(normalizedChannel);
+                            if (photoResult.success && photoResult.photoPath) {
+                                const photoFileName = path.basename(photoResult.photoPath);
+                                result.data.profilePhotoUrl = `/photos/${photoFileName}`;
+                            }
+                        } catch (photoError) {
+                            logger.warn(`Failed to get channel photo: ${photoError.message}`);
+                            // Continue without photo - don't fail the entire request
+                        }
                     }
 
                     // Add response headers

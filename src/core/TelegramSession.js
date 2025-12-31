@@ -577,6 +577,64 @@ export class TelegramSession {
         }
     }
 
+    async downloadChannelPhoto(channelInput) {
+        try {
+            let entity;
+
+            if (channelInput.includes('t.me')) {
+                const username = channelInput.split('t.me/')[1].split('/')[0].replace('@', '');
+                entity = await this.client.getEntity(username);
+            } else if (channelInput.startsWith('@')) {
+                entity = await this.client.getEntity(channelInput);
+            } else if (/^-?\d+$/.test(channelInput)) {
+                let channelId = channelInput.toString();
+                if (!channelId.startsWith('-100') && !channelId.startsWith('-')) {
+                    channelId = '-100' + channelId;
+                }
+                entity = await this.client.getEntity(BigInt(channelId));
+            } else {
+                entity = await this.client.getEntity(channelInput);
+            }
+
+            // Download profile photo
+            const photoBuffer = await this.client.downloadProfilePhoto(entity, {
+                isBig: true
+            });
+
+            if (!photoBuffer || photoBuffer.length === 0) {
+                return null; // No photo available
+            }
+
+            // Save to temp directory
+            const fs = await import('fs');
+            const path = await import('path');
+            const photosDir = path.join(process.cwd(), 'temp', 'channel-photos');
+
+            if (!fs.existsSync(photosDir)) {
+                fs.mkdirSync(photosDir, { recursive: true });
+            }
+
+            const fileName = `${entity.id}.jpg`;
+            const filePath = path.join(photosDir, fileName);
+
+            fs.writeFileSync(filePath, photoBuffer);
+
+            logger.info(`Downloaded channel photo for ${entity.id} to ${filePath}`);
+
+            return filePath;
+
+        } catch (error) {
+            logger.error(`Download photo failed: ${error.message}`);
+
+            if (error.message.includes('AUTH_KEY')) {
+                this.healthStatus = 'dead';
+                this.isConnected = false;
+            }
+
+            throw error;
+        }
+    }
+
     getStatus() {
         const usagePercentage = Math.round((this.currentChannelsCount / this.maxChannels) * 100);
 
