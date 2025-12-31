@@ -415,8 +415,6 @@ export class APIServer {
                     const {
                         channel,
                         includePhoto = 'false',
-                        joinIfNeeded = 'true',
-                        leaveAfter = 'false',
                         forceRefresh = 'false'
                     } = req.query;
 
@@ -456,28 +454,20 @@ export class APIServer {
                                 const result = {
                                     success: true,
                                     data: {
-                                        success: true,
                                         id: joinResult.channelId,
                                         title: joinResult.channelTitle,
                                         username: joinResult.channelUsername || null,
                                         participantsCount: joinResult.membersCount || 0,
-                                        isPrivate: true,
-                                        joinedVia: 'invite_link',
-                                        alreadyJoined: joinResult.alreadyJoined || false,
-                                        sessionUsed: joinResult.sessionUsed
+                                        isPrivate: true
                                     }
                                 };
 
-                                // Default: leave after getting info (unless already joined or leaveAfter=false)
-                                const shouldLeave = leaveAfter !== 'false' && !joinResult.alreadyJoined;
-                                if (shouldLeave) {
-                                    try {
-                                        await this.telegramManager.leaveChannel(joinResult.channelId, joinResult.sessionUsed);
-                                        result.data.leftAfterInfo = true;
-                                        logger.info(`Left channel after getting info: ${joinResult.channelTitle}`);
-                                    } catch (leaveErr) {
-                                        logger.warn(`Failed to leave after info: ${leaveErr.message}`);
-                                    }
+                                // Always leave after getting info for private channels
+                                try {
+                                    await this.telegramManager.leaveChannel(joinResult.channelId, joinResult.sessionUsed);
+                                    logger.info(`Left channel after getting info: ${joinResult.channelTitle}`);
+                                } catch (leaveErr) {
+                                    logger.warn(`Failed to leave after info: ${leaveErr.message}`);
                                 }
 
                                 return res.json(result);
@@ -506,7 +496,7 @@ export class APIServer {
                     }
 
                     // Check server-side cache first (LRU cache handles TTL automatically)
-                    const cacheKey = `${normalizedChannel}_${joinIfNeeded}_${leaveAfter}`;
+                    const cacheKey = normalizedChannel;
                     if (forceRefresh !== 'true') {
                         const cached = this.channelInfoCache.get(cacheKey);
                         if (cached !== null) {
@@ -524,12 +514,10 @@ export class APIServer {
 
                     // Parse boolean parameters
                     const options = {
-                        joinIfNeeded: joinIfNeeded === 'true',
-                        leaveAfter: leaveAfter === 'true',
                         forceRefresh: forceRefresh === 'true'
                     };
 
-                    logger.info(`Getting channel info with options:`, options);
+                    logger.info(`Getting channel info for: ${normalizedChannel}`);
 
                     // Increased timeout to 30 seconds
                     const timeoutPromise = new Promise((_, reject) => {
